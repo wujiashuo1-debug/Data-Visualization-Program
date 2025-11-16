@@ -1,0 +1,3393 @@
+{% extends "base.html" %}
+
+{% block title %}仪表盘 - 数据可视化程序{% endblock %}
+
+{% block content %}
+<div class="dashboard-new-container">
+    <!-- 顶部导航栏 -->
+    <header class="top-header">
+        <div class="header-left">
+            <h1 class="app-title">{{ texts.app_title }} - {{ texts.dashboard_mode }}</h1>
+        </div>
+        <div class="header-right">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-classic-mode" title="{{ texts.switch_to_classic }}">
+                📋 {{ texts.classic_mode }}
+            </a>
+            <!-- 语言切换按钮 -->
+            <div class="language-switcher">
+                <button onclick="switchLanguage('zh')" class="btn btn-lang {% if lang == 'zh' %}active{% endif %}" id="lang-btn-zh" title="中文">
+                    🇨🇳 中文
+                </button>
+                <button onclick="switchLanguage('en')" class="btn btn-lang {% if lang == 'en' %}active{% endif %}" id="lang-btn-en" title="English">
+                    🇺🇸 EN
+                </button>
+            </div>
+            <span class="welcome-text">{{ texts.welcome }}，{{ username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-logout">{{ texts.logout }}</a>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- 左侧边栏 -->
+        <aside class="left-sidebar">
+            <!-- 数据区域 -->
+            <div class="sidebar-panel">
+                <div class="panel-header">
+                    <span class="icon">📊</span>
+                    <h3 id="dataTitle">{{ texts.data }}</h3>
+                </div>
+                
+                <!-- 文件上传 -->
+                <div class="upload-section">
+                    <button class="btn-upload" id="uploadBtn" onclick="document.getElementById('fileInput').click()">
+                        📁 {{ texts.upload_file }}
+                    </button>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display: none;" onchange="uploadFile(this)">
+                </div>
+
+                <!-- 文件列表 -->
+                <div class="file-list-section">
+                    <div class="file-list-header" id="fileListHeader">{{ texts.select_file }}</div>
+                    <div class="file-list" id="fileList">
+                        {% if data_files %}
+                            {% for file in data_files %}
+                            <div class="file-list-item" data-file-id="{{ file.id }}">
+                                <span class="file-name">{{ file.original_filename }}</span>
+                                <button class="file-delete-btn" title="{{ texts.delete_file }}">🗑️</button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="file-list-empty" id="fileListEmpty">{{ texts.no_data_files }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 字段区域 -->
+            <div class="sidebar-panel" id="fieldsPanel" style="display: none;">
+                <div class="panel-header">
+                    <span class="icon">📐</span>
+                    <h3 id="fieldsTitle">{{ texts.fields }}</h3>
+                </div>
+
+                <!-- 维度 -->
+                <div class="field-group">
+                    <div class="field-group-header" onclick="toggleFieldGroup('dimensions')">
+                        <span class="collapse-icon">▼</span>
+                        <span id="dimensionsTitle">{{ texts.dimensions }}</span>
+                    </div>
+                    <div class="field-list" id="dimensionsList">
+                        <!-- 动态填充 -->
+                    </div>
+                </div>
+
+                <!-- 度量 -->
+                <div class="field-group">
+                    <div class="field-group-header" onclick="toggleFieldGroup('measures')">
+                        <span class="collapse-icon">▼</span>
+                        <span id="measuresTitle">{{ texts.measures }}</span>
+                    </div>
+                    <div class="field-list" id="measuresList">
+                        <!-- 动态填充 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 部件配置面板 -->
+            <div class="sidebar-panel" id="widgetConfigPanel" style="display: none;">
+                <div class="panel-header">
+                    <span class="icon">⚙️</span>
+                    <h3 id="widgetConfigTitle">{{ texts.widget_config }}</h3>
+                    <button class="close-config-btn" onclick="closeLeftConfig()" title="{{ texts.close }}">&times;</button>
+                </div>
+
+                <div class="config-content" id="widgetConfigContent">
+                    <!-- 动态填充配置内容 -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中间内容区域 -->
+        <div class="center-content">
+            <!-- 部件工具栏 -->
+            <div class="widget-toolbar">
+                <div class="toolbar-label" id="widgetLabel">{{ texts.widgets }}：</div>
+                <div class="widget-items">
+                    <div class="widget-item" draggable="true" ondragstart="dragWidget(event, 'list')" title="{{ texts.list_table }}">
+                        <span class="widget-icon">📋</span>
+                        <span class="widget-label" data-widget-type="list">{{ texts.list_table }}</span>
+                    </div>
+                    <div class="widget-item" draggable="true" ondragstart="dragWidget(event, 'cross')" title="{{ texts.cross_table }}">
+                        <span class="widget-icon">📊</span>
+                        <span class="widget-label" data-widget-type="cross">{{ texts.cross_table }}</span>
+                    </div>
+                    <div class="widget-item" draggable="true" ondragstart="dragWidget(event, 'chart')" title="{{ texts.widget_chart }}">
+                        <span class="widget-icon">📈</span>
+                        <span class="widget-label" data-widget-type="chart">{{ texts.widget_chart }}</span>
+                    </div>
+                    <div class="widget-item" draggable="true" ondragstart="dragWidget(event, 'text')" title="{{ texts.widget_text }}">
+                        <span class="widget-icon">📝</span>
+                        <span class="widget-label" data-widget-type="text">{{ texts.widget_text }}</span>
+                    </div>
+                    <div class="widget-item" draggable="true" ondragstart="dragWidget(event, 'image')" title="{{ texts.widget_image }}">
+                        <span class="widget-icon">🖼️</span>
+                        <span class="widget-label" data-widget-type="image">{{ texts.widget_image }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 仪表盘画布区域 -->
+            <div class="dashboard-canvas" id="dashboardCanvas" 
+                 ondrop="dropWidget(event)" 
+                 ondragover="allowDrop(event)">
+                <div class="canvas-placeholder">
+                    <div class="placeholder-icon">📊</div>
+                    <p id="canvasPlaceholder">{{ texts.drag_widget_here }}</p>
+                    <p class="placeholder-hint" id="canvasHint">{{ texts.supports_widgets }}</p>
+                    <div class="usage-tips">
+                        <p><strong id="tipsTitle">💡 {{ texts.usage_tips }}：</strong></p>
+                        <p id="tip1">• {{ texts.tip_click_widget }}</p>
+                        <p id="tip2">• {{ texts.tip_drag_resize }}</p>
+                        <p id="tip3">• {{ texts.tip_resize_widget }}</p>
+                        <p id="tip4">• {{ texts.tip_hover_delete }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图形配置面板（模态框） -->
+<div class="modal-overlay" id="chartConfigModal" style="display: none;" onclick="closeChartConfig(event)">
+    <div class="modal-content chart-config-panel" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>图形配置</h2>
+            <button class="modal-close-btn" onclick="closeChartConfig()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- 图表类型选择 -->
+            <div class="config-section">
+                <label class="config-label">图表类型</label>
+                <select id="chartTypeSelect" class="config-select" onchange="updateChartConfig()">
+                    <option value="">-- 选择图表类型 --</option>
+                    <option value="line">📈 折线图</option>
+                    <option value="bar">📊 柱状图</option>
+                    <option value="area">📊 面积图</option>
+                    <option value="pie">🥧 饼图</option>
+                    <option value="waterfall">📈 瀑布图</option>
+                    <option value="scatter">🔵 散点图</option>
+                    <option value="wordcloud">☁️ 词云图</option>
+                    <option value="map">🗺️ 地图</option>
+                    <option value="sunburst">☀️ 旭日图</option>
+                    <option value="combo_single">📊 单Y联合图</option>
+                    <option value="combo_dual">📊 双Y联合图</option>
+                </select>
+            </div>
+
+            <!-- 主题选择 -->
+            <div class="config-section">
+                <label class="config-label">主题</label>
+                <select id="chartThemeSelect" class="config-select">
+                    <option value="purple">紫色</option>
+                    <option value="blue">蓝色</option>
+                    <option value="green">绿色</option>
+                    <option value="red">红色</option>
+                    <option value="orange">橙色</option>
+                    <option value="pink">粉色</option>
+                    <option value="teal">青色</option>
+                </select>
+            </div>
+
+            <!-- 动态配置区域 -->
+            <div id="dynamicConfigArea">
+                <!-- 根据图表类型动态显示配置项 -->
+            </div>
+
+            <!-- 按钮 -->
+            <div class="config-buttons">
+                <button class="btn btn-secondary" onclick="closeChartConfig()">取消</button>
+                <button class="btn btn-primary" onclick="generateChart()">生成图表</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 文本编辑面板 -->
+<div class="modal-overlay" id="textEditModal" style="display: none;" onclick="closeTextEdit(event)">
+    <div class="modal-content text-edit-panel" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>编辑文本</h2>
+            <button class="modal-close-btn" onclick="closeTextEdit()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="config-section">
+                <label class="config-label">文本内容</label>
+                <textarea id="textContentInput" class="text-input" rows="10" placeholder="输入文本内容..."></textarea>
+            </div>
+
+            <div class="config-section">
+                <label class="config-label">字体大小</label>
+                <select id="textFontSizeSelect" class="config-select">
+                    <option value="12">12px</option>
+                    <option value="14">14px</option>
+                    <option value="16" selected>16px</option>
+                    <option value="18">18px</option>
+                    <option value="20">20px</option>
+                    <option value="24">24px</option>
+                    <option value="28">28px</option>
+                    <option value="32">32px</option>
+                </select>
+            </div>
+
+            <div class="config-buttons">
+                <button class="btn btn-secondary" onclick="closeTextEdit()">取消</button>
+                <button class="btn btn-primary" onclick="saveTextContent()">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图片上传面板 -->
+<div class="modal-overlay" id="imageUploadModal" style="display: none;" onclick="closeImageUpload(event)">
+    <div class="modal-content image-upload-panel" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>上传图片</h2>
+            <button class="modal-close-btn" onclick="closeImageUpload()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="config-section">
+                <label class="config-label">选择图片</label>
+                <input type="file" id="imageFileInput" accept="image/*" class="file-input">
+            </div>
+
+            <div class="config-buttons">
+                <button class="btn btn-secondary" onclick="closeImageUpload()">取消</button>
+                <button class="btn btn-primary" onclick="uploadImage()">上传</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 全局变量
+let selectedFileId = null;
+let currentColumns = [];
+let widgetCounter = 0;
+let currentEditingWidget = null;
+
+// 部件配置存储
+let widgetConfigs = {};
+
+// 当前语言
+var currentLanguage = '{{ lang }}';
+var allTexts = {{ texts | tojson }};
+
+// 切换语言（无刷新）
+function switchLanguage(lang) {
+    if (lang === currentLanguage) return;
+    
+    fetch('/api/set_language/' + lang, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentLanguage = lang;
+            allTexts = data.texts;
+            updatePageTexts();
+            updateLanguageButtons();
+        }
+    })
+    .catch(error => {
+        console.error('语言切换失败:', error);
+    });
+}
+
+// 更新语言按钮状态
+function updateLanguageButtons() {
+    document.getElementById('lang-btn-zh').classList.toggle('active', currentLanguage === 'zh');
+    document.getElementById('lang-btn-en').classList.toggle('active', currentLanguage === 'en');
+}
+
+// 更新页面文本
+function updatePageTexts() {
+    // 更新header标题
+    document.querySelector('.app-title').textContent = allTexts.app_title + ' - ' + allTexts.dashboard_mode;
+    
+    // 更新按钮文本
+    const classicBtn = document.querySelector('.btn-classic-mode');
+    if (classicBtn) {
+        classicBtn.innerHTML = '📋 ' + allTexts.classic_mode;
+        classicBtn.title = allTexts.switch_to_classic;
+    }
+    
+    // 更新欢迎文本
+    const welcomeText = document.querySelector('.welcome-text');
+    if (welcomeText) {
+        const username = welcomeText.textContent.split('，')[1] || welcomeText.textContent.split(', ')[1];
+        welcomeText.textContent = allTexts.welcome + (currentLanguage === 'zh' ? '，' : ', ') + username;
+    }
+    
+    // 更新注销按钮
+    document.querySelector('.btn-logout').textContent = allTexts.logout;
+    
+    // 更新侧边栏标题
+    const dataTitle = document.getElementById('dataTitle');
+    if (dataTitle) dataTitle.textContent = allTexts.data;
+    
+    const fieldsTitle = document.getElementById('fieldsTitle');
+    if (fieldsTitle) fieldsTitle.textContent = allTexts.fields;
+    
+    const widgetConfigTitle = document.getElementById('widgetConfigTitle');
+    if (widgetConfigTitle) widgetConfigTitle.textContent = allTexts.widget_config;
+    
+    // 更新上传按钮
+    const uploadBtn = document.getElementById('uploadBtn');
+    if (uploadBtn) uploadBtn.innerHTML = '📁 ' + allTexts.upload_file;
+    
+    // 更新文件列表标题
+    const fileListHeader = document.getElementById('fileListHeader');
+    if (fileListHeader) fileListHeader.textContent = allTexts.select_file;
+    
+    const fileListEmpty = document.getElementById('fileListEmpty');
+    if (fileListEmpty) fileListEmpty.textContent = allTexts.no_data_files;
+    
+    // 更新维度/度量标题
+    const dimensionsTitle = document.getElementById('dimensionsTitle');
+    if (dimensionsTitle) dimensionsTitle.textContent = allTexts.dimensions;
+    
+    const measuresTitle = document.getElementById('measuresTitle');
+    if (measuresTitle) measuresTitle.textContent = allTexts.measures;
+    
+    // 更新部件工具栏标签
+    const widgetLabel = document.getElementById('widgetLabel');
+    if (widgetLabel) widgetLabel.textContent = allTexts.widgets + '：';
+    
+    // 更新部件类型标签
+    document.querySelectorAll('[data-widget-type]').forEach(el => {
+        const type = el.getAttribute('data-widget-type');
+        if (type === 'list') el.textContent = allTexts.list_table;
+        else if (type === 'cross') el.textContent = allTexts.cross_table;
+        else if (type === 'chart') el.textContent = allTexts.widget_chart;
+        else if (type === 'text') el.textContent = allTexts.widget_text;
+        else if (type === 'image') el.textContent = allTexts.widget_image;
+    });
+    
+    // 更新画布提示文本
+    const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+    if (canvasPlaceholder) canvasPlaceholder.textContent = allTexts.drag_widget_here;
+    
+    const canvasHint = document.getElementById('canvasHint');
+    if (canvasHint) canvasHint.textContent = allTexts.supports_widgets;
+    
+    const tipsTitle = document.getElementById('tipsTitle');
+    if (tipsTitle) tipsTitle.innerHTML = '💡 ' + allTexts.usage_tips + '：';
+    
+    const tip1 = document.getElementById('tip1');
+    if (tip1) tip1.textContent = '• ' + allTexts.tip_click_widget;
+    
+    const tip2 = document.getElementById('tip2');
+    if (tip2) tip2.textContent = '• ' + allTexts.tip_drag_resize;
+    
+    const tip3 = document.getElementById('tip3');
+    if (tip3) tip3.textContent = '• ' + allTexts.tip_resize_widget;
+    
+    const tip4 = document.getElementById('tip4');
+    if (tip4) tip4.textContent = '• ' + allTexts.tip_hover_delete;
+    
+    // 更新所有已存在的部件占位符文本
+    document.querySelectorAll('.widget-placeholder').forEach(placeholder => {
+        const widget = placeholder.closest('.widget');
+        if (widget) {
+            const widgetType = widget.getAttribute('data-widget-type');
+            if (widgetType === 'list' || widgetType === 'cross') {
+                placeholder.textContent = allTexts.click_widget_to_config;
+            } else if (widgetType === 'chart') {
+                placeholder.textContent = allTexts.click_widget_config_chart;
+            } else if (widgetType === 'text') {
+                placeholder.textContent = allTexts.click_widget_add_text;
+            } else if (widgetType === 'image') {
+                placeholder.textContent = allTexts.click_widget_upload_image;
+            }
+        }
+    });
+}
+
+// 上传文件
+function uploadFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    showLoading('正在上传文件...');
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            alert('文件上传成功！');
+            // 不再刷新页面，而是动态添加文件到下拉列表
+            addFileToSelector(data.file_id, data.filename);
+            // 自动选择新上传的文件
+            selectFile(data.file_id);
+        } else {
+            alert('上传失败: ' + data.message);
+        }
+        // 清空文件选择器，允许重新上传同一文件
+        input.value = '';
+    })
+    .catch(error => {
+        hideLoading();
+        alert('上传失败: ' + error.message);
+        input.value = '';
+    });
+}
+
+// 添加文件到列表
+function addFileToSelector(fileId, filename) {
+    const fileList = document.getElementById('fileList');
+    
+    // 移除"暂无数据文件"提示
+    const emptyMsg = fileList.querySelector('.file-list-empty');
+    if (emptyMsg) {
+        emptyMsg.remove();
+    }
+    
+    // 检查文件是否已存在
+    const existingItem = fileList.querySelector(`[data-file-id="${fileId}"]`);
+    if (existingItem) {
+        return; // 文件已存在，不重复添加
+    }
+    
+    // 创建新文件项
+    const fileItem = document.createElement('div');
+    fileItem.className = 'file-list-item';
+    fileItem.dataset.fileId = fileId;
+    
+    const fileName = document.createElement('span');
+    fileName.className = 'file-name';
+    fileName.textContent = filename;
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'file-delete-btn';
+    deleteBtn.textContent = '🗑️';
+    deleteBtn.title = '删除文件';
+    
+    // 添加事件监听器
+    fileItem.addEventListener('click', function(e) {
+        if (e.target.classList.contains('file-delete-btn')) {
+            return;
+        }
+        selectFile(fileId);
+    });
+    
+    deleteBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        deleteFile(fileId, e);
+    });
+    
+    fileItem.appendChild(fileName);
+    fileItem.appendChild(deleteBtn);
+    fileList.appendChild(fileItem);
+}
+
+// 选择文件
+function selectFile(fileId) {
+    if (!fileId) {
+        document.getElementById('fieldsPanel').style.display = 'none';
+        return;
+    }
+
+    selectedFileId = fileId;
+    
+    // 更新选中状态
+    const fileList = document.getElementById('fileList');
+    const allItems = fileList.querySelectorAll('.file-list-item');
+    allItems.forEach(item => {
+        if (item.dataset.fileId == fileId) {
+            item.classList.add('selected');
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+    
+    loadFileColumns(fileId);
+}
+
+// 保持兼容性
+function handleFileSelect(fileId) {
+    selectFile(fileId);
+}
+
+// 删除文件
+function deleteFile(fileId, event) {
+    // 阻止事件冒泡，避免触发文件选择
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    if (!confirm('确定要删除这个文件吗？删除后无法恢复。')) {
+        return;
+    }
+    
+    showLoading('正在删除文件...');
+    
+    fetch(`/api/file/${fileId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            alert('文件删除成功！');
+            // 从列表中移除
+            const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+            if (fileItem) {
+                fileItem.remove();
+            }
+            
+            // 如果删除的是当前选中的文件，清空字段面板
+            if (selectedFileId == fileId) {
+                selectedFileId = null;
+                document.getElementById('fieldsPanel').style.display = 'none';
+                document.getElementById('dimensionsList').innerHTML = '';
+                document.getElementById('measuresList').innerHTML = '';
+            }
+            
+            // 如果列表为空，显示提示
+            const fileList = document.getElementById('fileList');
+            if (fileList.children.length === 0) {
+                fileList.innerHTML = '<div class="file-list-empty">暂无数据文件</div>';
+            }
+        } else {
+            alert('删除失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('删除失败: ' + error.message);
+    });
+}
+
+// 加载文件字段
+function loadFileColumns(fileId) {
+    fetch(`/api/file/${fileId}/columns`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 保存字段信息（用于后续使用）
+            currentColumns = {
+                dimensions: data.dimensions || [],
+                measures: data.measures || []
+            };
+            displayColumns(data);
+            document.getElementById('fieldsPanel').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('加载字段失败:', error);
+        alert('加载字段失败: ' + error.message);
+    });
+}
+
+// 显示字段列表
+function displayColumns(data) {
+    const dimensionsList = document.getElementById('dimensionsList');
+    const measuresList = document.getElementById('measuresList');
+    
+    dimensionsList.innerHTML = '';
+    measuresList.innerHTML = '';
+
+    // 显示维度字段
+    if (data.dimensions && data.dimensions.length > 0) {
+        data.dimensions.forEach(fieldName => {
+            const fieldItem = document.createElement('div');
+            fieldItem.className = 'field-item';
+            fieldItem.draggable = true;
+            fieldItem.textContent = fieldName;
+            fieldItem.dataset.columnName = fieldName;
+            fieldItem.dataset.columnType = 'dimension';
+            
+            fieldItem.addEventListener('dragstart', function(e) {
+                e.dataTransfer.setData('columnName', fieldName);
+                e.dataTransfer.setData('columnType', 'dimension');
+            });
+            
+            dimensionsList.appendChild(fieldItem);
+        });
+    } else {
+        dimensionsList.innerHTML = '<div style="padding: 10px; color: #999; font-size: 12px;">暂无维度字段</div>';
+    }
+
+    // 显示度量字段
+    if (data.measures && data.measures.length > 0) {
+        data.measures.forEach(fieldName => {
+            const fieldItem = document.createElement('div');
+            fieldItem.className = 'field-item';
+            fieldItem.draggable = true;
+            fieldItem.textContent = fieldName;
+            fieldItem.dataset.columnName = fieldName;
+            fieldItem.dataset.columnType = 'measure';
+            
+            fieldItem.addEventListener('dragstart', function(e) {
+                e.dataTransfer.setData('columnName', fieldName);
+                e.dataTransfer.setData('columnType', 'measure');
+            });
+            
+            measuresList.appendChild(fieldItem);
+        });
+    } else {
+        measuresList.innerHTML = '<div style="padding: 10px; color: #999; font-size: 12px;">暂无度量字段</div>';
+    }
+}
+
+// 拖拽部件
+function dragWidget(event, widgetType) {
+    event.dataTransfer.setData('widgetType', widgetType);
+}
+
+// 允许放置
+function allowDrop(event) {
+    event.preventDefault();
+}
+
+// 放置部件
+function dropWidget(event) {
+    event.preventDefault();
+    
+    const widgetType = event.dataTransfer.getData('widgetType');
+    if (!widgetType) return;
+
+    // 移除占位符
+    const placeholder = document.querySelector('.canvas-placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
+    // 创建部件
+    createWidget(widgetType, event.clientX, event.clientY);
+}
+
+// 创建部件
+function createWidget(type, x, y) {
+    widgetCounter++;
+    const widgetId = `widget_${widgetCounter}`;
+    
+    const canvas = document.getElementById('dashboardCanvas');
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    const widget = document.createElement('div');
+    widget.className = 'dashboard-widget';
+    widget.id = widgetId;
+    widget.style.left = (x - canvasRect.left) + 'px';
+    widget.style.top = (y - canvasRect.top) + 'px';
+    
+    // 部件工具栏（hover时显示）
+    const toolbar = document.createElement('div');
+    toolbar.className = 'widget-toolbar-hover';
+    toolbar.innerHTML = `
+        <button class="widget-tool-btn" onclick="event.stopPropagation(); deleteWidget('${widgetId}')" title="删除">
+            <span>🗑️</span>
+        </button>
+    `;
+    
+    // 部件类型标签（左上角）
+    const typeLabel = document.createElement('div');
+    typeLabel.className = 'widget-type-label';
+    typeLabel.textContent = getWidgetTypeIcon(type);
+    
+    // 部件内容
+    const content = document.createElement('div');
+    content.className = 'widget-content';
+    content.innerHTML = getWidgetPlaceholder(type);
+    
+    widget.appendChild(toolbar);
+    widget.appendChild(typeLabel);
+    widget.appendChild(content);
+    canvas.appendChild(widget);
+    
+    // 保存部件配置
+    widgetConfigs[widgetId] = {
+        type: type,
+        config: {}
+    };
+    
+    // 使部件可拖拽（已包含点击选中逻辑）
+    makeWidgetDraggable(widget);
+    makeWidgetResizable(widget);
+}
+
+// 获取部件标题
+function getWidgetTitle(type) {
+    const titles = {
+        'list': '📋 清单表',
+        'cross': '📊 交叉表',
+        'chart': '📈 图形',
+        'text': '📝 文本',
+        'image': '🖼️ 图片'
+    };
+    return titles[type] || '部件';
+}
+
+// 获取部件类型图标
+function getWidgetTypeIcon(type) {
+    const icons = {
+        'list': '📋',
+        'cross': '📊',
+        'chart': '📈',
+        'text': '📝',
+        'image': '🖼️'
+    };
+    return icons[type] || '📌';
+}
+
+// 获取部件占位内容
+function getWidgetPlaceholder(type) {
+    const placeholders = {
+        'list': '<div class="widget-placeholder">' + allTexts.click_widget_to_config + '</div>',
+        'cross': '<div class="widget-placeholder">' + allTexts.click_widget_to_config + '</div>',
+        'chart': '<div class="widget-placeholder">' + allTexts.click_widget_config_chart + '</div>',
+        'text': '<div class="widget-placeholder">' + allTexts.click_widget_add_text + '</div>',
+        'image': '<div class="widget-placeholder">' + allTexts.click_widget_upload_image + '</div>'
+    };
+    return placeholders[type] || '';
+}
+
+// 当前选中的部件
+let selectedWidgetId = null;
+
+// 选中部件
+function selectWidget(widgetId) {
+    // 取消之前选中的部件
+    if (selectedWidgetId) {
+        const prevWidget = document.getElementById(selectedWidgetId);
+        if (prevWidget) {
+            prevWidget.classList.remove('widget-selected');
+        }
+    }
+    
+    // 选中新部件
+    selectedWidgetId = widgetId;
+    const widget = document.getElementById(widgetId);
+    if (widget) {
+        widget.classList.add('widget-selected');
+    }
+    
+    // 在左侧显示配置
+    showLeftConfig(widgetId);
+}
+
+// 在左侧显示配置
+function showLeftConfig(widgetId) {
+    const config = widgetConfigs[widgetId];
+    const panel = document.getElementById('widgetConfigPanel');
+    const fieldsPanel = document.getElementById('fieldsPanel');
+    const content = document.getElementById('widgetConfigContent');
+    
+    if (!config) return;
+    
+    // 对于需要字段拖拽的部件类型，显示字段面板
+    if (config.type === 'list' || config.type === 'cross' || config.type === 'chart') {
+        fieldsPanel.style.display = 'block';
+    }
+    
+    // 根据部件类型显示不同的配置界面
+    if (config.type === 'chart') {
+        content.innerHTML = getChartConfigHTML(widgetId);
+    } else if (config.type === 'list') {
+        content.innerHTML = getListConfigHTML(widgetId);
+    } else if (config.type === 'cross') {
+        content.innerHTML = getCrossConfigHTML(widgetId);
+    } else if (config.type === 'text') {
+        content.innerHTML = getTextConfigHTML(widgetId, config);
+    } else if (config.type === 'image') {
+        content.innerHTML = getImageConfigHTML(widgetId);
+    } else {
+        content.innerHTML = `
+            <div class="config-section">
+                <p>该部件类型配置功能即将推出...</p>
+            </div>
+        `;
+    }
+    
+    // 显示配置面板
+    panel.style.display = 'block';
+}
+
+// 关闭左侧配置
+function closeLeftConfig() {
+    document.getElementById('widgetConfigPanel').style.display = 'none';
+    
+    // 取消选中
+    if (selectedWidgetId) {
+        const widget = document.getElementById(selectedWidgetId);
+        if (widget) {
+            widget.classList.remove('widget-selected');
+        }
+        selectedWidgetId = null;
+    }
+}
+
+// 获取图表配置HTML
+function getChartConfigHTML(widgetId) {
+    if (!selectedFileId) {
+        return '<div class="config-section"><p style="color: #f56565;">请先选择数据文件</p></div>';
+    }
+    
+    const config = widgetConfigs[widgetId];
+    const currentChartType = config.chartType || '';
+    
+    return `
+        <div class="config-section">
+            <h4 style="margin: 0 0 10px 0; color: #2d3748;">📊 ${allTexts.chart_config}</h4>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.chart_type}</label>
+            <select id="leftChartType" class="config-select" onchange="updateChartConfigOptions('${widgetId}')">
+                <option value="">${allTexts.select_chart_type}</option>
+                <option value="line" ${currentChartType === 'line' ? 'selected' : ''}>📈 ${allTexts.line_chart}</option>
+                <option value="bar" ${currentChartType === 'bar' ? 'selected' : ''}>📊 ${allTexts.bar_chart}</option>
+                <option value="area" ${currentChartType === 'area' ? 'selected' : ''}>📊 ${allTexts.area_chart}</option>
+                <option value="pie" ${currentChartType === 'pie' ? 'selected' : ''}>🥧 ${allTexts.pie_chart}</option>
+                <option value="waterfall" ${currentChartType === 'waterfall' ? 'selected' : ''}>📈 ${allTexts.waterfall_chart}</option>
+                <option value="scatter" ${currentChartType === 'scatter' ? 'selected' : ''}>🔵 ${allTexts.scatter_chart}</option>
+                <option value="wordcloud" ${currentChartType === 'wordcloud' ? 'selected' : ''}>☁️ ${allTexts.wordcloud}</option>
+                <option value="map" ${currentChartType === 'map' ? 'selected' : ''}>🗺️ ${allTexts.map}</option>
+                <option value="sunburst" ${currentChartType === 'sunburst' ? 'selected' : ''}>☀️ ${allTexts.sunburst}</option>
+                <option value="combo_single" ${currentChartType === 'combo_single' ? 'selected' : ''}>📊 ${allTexts.combo_single}</option>
+                <option value="combo_dual" ${currentChartType === 'combo_dual' ? 'selected' : ''}>📊 ${allTexts.combo_dual}</option>
+            </select>
+        </div>
+        
+        <div id="chartOptionsContainer_${widgetId}">
+            ${getChartTypeSpecificOptions(widgetId, currentChartType)}
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.theme}</label>
+            <select id="leftChartTheme" class="config-select">
+                <option value="purple">${allTexts.purple}</option>
+                <option value="blue">${allTexts.blue}</option>
+                <option value="green">${allTexts.green}</option>
+                <option value="red">${allTexts.red}</option>
+                <option value="orange">${allTexts.orange}</option>
+                <option value="pink">${allTexts.pink}</option>
+                <option value="teal">${allTexts.teal}</option>
+            </select>
+        </div>
+        
+        <div class="config-section">
+            <button class="btn btn-primary" style="width: 100%;" onclick="generateChartInWidget('${widgetId}')">
+                🚀 ${allTexts.generate_chart_btn}
+            </button>
+        </div>
+    `;
+}
+
+// 更新图表配置选项
+function updateChartConfigOptions(widgetId) {
+    const chartType = document.getElementById('leftChartType').value;
+    const container = document.getElementById(`chartOptionsContainer_${widgetId}`);
+    if (container) {
+        container.innerHTML = getChartTypeSpecificOptions(widgetId, chartType);
+    }
+    
+    // 保存图表类型
+    widgetConfigs[widgetId].chartType = chartType;
+}
+
+// 获取特定图表类型的配置选项
+function getChartTypeSpecificOptions(widgetId, chartType) {
+    if (!chartType) {
+        return '<div class="config-section"><p style="font-size: 12px; color: #718096;">' + allTexts.please_select_chart_type_first + '</p></div>';
+    }
+    
+    const config = widgetConfigs[widgetId];
+    
+    // 词云图配置
+    if (chartType === 'wordcloud') {
+        return `
+            <div class="config-section">
+                <label class="config-label">${allTexts.text_field}</label>
+                <select id="leftWordcloudTextField" class="config-select">
+                    <option value="">${allTexts.select_text_field_label}</option>
+                    ${currentColumns.dimensions.map(col => `<option value="${col}">${col}</option>`).join('')}
+                </select>
+            </div>
+            
+            <div class="config-section">
+                <label class="config-label">${allTexts.select_weight_field}</label>
+                <select id="leftWordcloudWeightField" class="config-select">
+                    <option value="">${allTexts.no_weight}</option>
+                    ${currentColumns.measures.map(col => `<option value="${col}">${col}</option>`).join('')}
+                </select>
+            </div>
+            
+            <div class="config-section">
+                <label class="config-label">${allTexts.wordcloud_shape}</label>
+                <select id="leftWordcloudShape" class="config-select">
+                    <option value="rectangle">${allTexts.shape_rectangle}</option>
+                    <option value="circle">${allTexts.shape_circle}</option>
+                    <option value="cloud">${allTexts.shape_cloud}</option>
+                    <option value="star">${allTexts.shape_star}</option>
+                    <option value="heart">${allTexts.shape_heart}</option>
+                    <option value="diamond">${allTexts.shape_diamond}</option>
+                </select>
+            </div>
+        `;
+    }
+    
+    // 旭日图配置
+    if (chartType === 'sunburst') {
+        return `
+            <div class="config-section">
+                <label class="config-label">${allTexts.dimension_hierarchy}</label>
+                <div class="widget-drop-zone" id="widgetSunburstRows_${widgetId}" 
+                     ondrop="widgetDrop(event, '${widgetId}', 'rows')" 
+                     ondragover="allowDrop(event)">
+                    <span class="drop-hint">${allTexts.drag_dimension_here}</span>
+                </div>
+            </div>
+            
+            <div class="config-section">
+                <label class="config-label">${allTexts.measure_field}</label>
+                <div class="widget-drop-zone" id="widgetSunburstValues_${widgetId}" 
+                     ondrop="widgetDrop(event, '${widgetId}', 'values')" 
+                     ondragover="allowDrop(event)">
+                    <span class="drop-hint">${allTexts.drag_measure_here}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 联合图配置
+    if (chartType === 'combo_single' || chartType === 'combo_dual') {
+        return `
+            <div class="config-section">
+                <label class="config-label">${allTexts.dimension_x_axis}</label>
+                <select id="leftComboDimension" class="config-select">
+                    <option value="">${allTexts.select_dimension}</option>
+                    ${currentColumns.dimensions.map(col => `<option value="${col}">${col}</option>`).join('')}
+                </select>
+            </div>
+            
+            <div class="config-section">
+                <label class="config-label">${allTexts.measure_fields}</label>
+                <div id="comboMeasuresContainer_${widgetId}">
+                    <button class="btn btn-secondary" style="width: 100%; margin-top: 5px;" onclick="addComboMeasure('${widgetId}')">
+                        ➕ ${allTexts.add_measure}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 常规图表配置（折线图、柱状图、散点图等）
+    return `
+        <div class="config-section">
+            <label class="config-label">${allTexts.x_axis_field}</label>
+            <select id="leftChartXAxis" class="config-select">
+                <option value="">${allTexts.select_x_axis}</option>
+                ${currentColumns.dimensions.map(col => `<option value="${col}">${col}</option>`).join('')}
+            </select>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.y_axis_field}</label>
+            <select id="leftChartYAxis" class="config-select">
+                <option value="">${allTexts.select_y_axis}</option>
+                ${currentColumns.measures.map(col => `<option value="${col}">${col}</option>`).join('')}
+            </select>
+        </div>
+        
+        ${chartType === 'scatter' ? `
+        <div class="config-section">
+            <label class="config-label">${allTexts.group_field_optional}</label>
+            <select id="leftChartGroupField" class="config-select">
+                <option value="">${allTexts.no_grouping}</option>
+                ${currentColumns.dimensions.map(col => `<option value="${col}">${col}</option>`).join('')}
+            </select>
+        </div>
+        ` : ''}
+    `;
+}
+
+// 获取文本配置HTML
+function getTextConfigHTML(widgetId, config) {
+    const currentContent = config.config.html || config.config.text || '';
+    
+    return `
+        <div class="config-section">
+            <h4 style="margin: 0 0 10px 0; color: #2d3748;">📝 文本编辑器</h4>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">格式工具栏</label>
+            <div class="rich-text-toolbar">
+                <!-- 文字格式 -->
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" onclick="formatText('bold')" title="加粗">
+                        <strong>B</strong>
+                    </button>
+                    <button class="toolbar-btn" onclick="formatText('italic')" title="斜体">
+                        <em>I</em>
+                    </button>
+                    <button class="toolbar-btn" onclick="formatText('underline')" title="下划线">
+                        <u>U</u>
+                    </button>
+                </div>
+                
+                <!-- 对齐方式 -->
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" onclick="formatText('justifyLeft')" title="左对齐">
+                        ☰
+                    </button>
+                    <button class="toolbar-btn" onclick="formatText('justifyCenter')" title="居中">
+                        ☱
+                    </button>
+                    <button class="toolbar-btn" onclick="formatText('justifyRight')" title="右对齐">
+                        ☲
+                    </button>
+                </div>
+                
+                <!-- 字体大小 -->
+                <div class="toolbar-group">
+                    <select class="toolbar-select" onchange="formatText('fontSize', this.value)" title="字体大小">
+                        <option value="">字号</option>
+                        <option value="1">12px</option>
+                        <option value="2">14px</option>
+                        <option value="3">16px</option>
+                        <option value="4">18px</option>
+                        <option value="5">24px</option>
+                        <option value="6">32px</option>
+                        <option value="7">48px</option>
+                    </select>
+                </div>
+                
+                <!-- 字体类型 -->
+                <div class="toolbar-group">
+                    <select class="toolbar-select" onchange="formatText('fontName', this.value)" title="字体">
+                        <option value="">字体</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Microsoft YaHei">微软雅黑</option>
+                        <option value="SimSun">宋体</option>
+                        <option value="SimHei">黑体</option>
+                        <option value="KaiTi">楷体</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                    </select>
+                </div>
+                
+                <!-- 字体颜色 -->
+                <div class="toolbar-group">
+                    <label class="toolbar-color-label" title="字体颜色">
+                        <span>A</span>
+                        <input type="color" id="textColorPicker" onchange="formatText('foreColor', this.value)" style="width: 30px; height: 24px; border: none; cursor: pointer;">
+                    </label>
+                </div>
+                
+                <!-- 背景颜色 -->
+                <div class="toolbar-group">
+                    <label class="toolbar-color-label" title="背景颜色">
+                        <span>🎨</span>
+                        <input type="color" id="textBgColorPicker" onchange="formatText('backColor', this.value)" style="width: 30px; height: 24px; border: none; cursor: pointer;">
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">文本内容</label>
+            <div id="richTextEditor" class="rich-text-editor" contenteditable="true" 
+                 style="min-height: 200px; max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px; background: white; font-size: 14px; line-height: 1.6;"
+                 placeholder="在此输入文本内容...">${currentContent}</div>
+        </div>
+        
+        <div class="config-section">
+            <button class="btn btn-primary" style="width: 100%;" onclick="saveTextInWidget('${widgetId}')">
+                💾 保存文本
+            </button>
+        </div>
+    `;
+}
+
+// 获取图片配置HTML
+function getImageConfigHTML(widgetId) {
+    return `
+        <div class="config-section">
+            <label class="config-label">${allTexts.select_image}</label>
+            <input type="file" id="leftImageFile" accept="image/*" class="config-input">
+        </div>
+        
+        <div class="config-section">
+            <button class="btn btn-primary" style="width: 100%;" onclick="uploadImageInWidget('${widgetId}')">
+                ${allTexts.upload_image}
+            </button>
+        </div>
+    `;
+}
+
+// 获取清单表配置HTML
+function getListConfigHTML(widgetId) {
+    if (!selectedFileId) {
+        return '<div class="config-section"><p style="color: #f56565;">' + allTexts.select_data_file_first + '</p></div>';
+    }
+    
+    // 初始化该部件的字段配置
+    if (!widgetConfigs[widgetId].fields) {
+        widgetConfigs[widgetId].fields = {
+            rows: [],
+            columns: [],
+            values: []
+        };
+    }
+    
+    const config = widgetConfigs[widgetId];
+    const hasMetadata = config.metadata;
+    
+    return `
+        <div class="config-section" style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; color: #2d3748;">📋 ${allTexts.list_table_config}</h4>
+            ${hasMetadata ? '<button class="btn-properties" onclick="showWidgetProperties(\'' + widgetId + '\')">📊 ' + allTexts.properties + '</button>' : ''}
+        </div>
+        
+        <div class="config-section">
+            <p style="font-size: 12px; color: #718096; margin: 0;">${allTexts.from_left_drag_dim_to_row}</p>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.row_fields}</label>
+            <div class="widget-drop-zone" id="widgetRows_${widgetId}" 
+                 ondrop="widgetDrop(event, '${widgetId}', 'rows')" 
+                 ondragover="allowDrop(event)">
+                <span class="drop-hint">${allTexts.drag_field_here}</span>
+            </div>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.column_fields}</label>
+            <div class="widget-drop-zone" id="widgetColumns_${widgetId}" 
+                 ondrop="widgetDrop(event, '${widgetId}', 'columns')" 
+                 ondragover="allowDrop(event)">
+                <span class="drop-hint">${allTexts.drag_field_here}</span>
+            </div>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.value_fields}</label>
+            <div class="widget-drop-zone" id="widgetValues_${widgetId}" 
+                 ondrop="widgetDrop(event, '${widgetId}', 'values')" 
+                 ondragover="allowDrop(event)">
+                <span class="drop-hint">${allTexts.drag_field_here}</span>
+            </div>
+        </div>
+        
+        <div class="config-section">
+            <button class="btn btn-primary" style="width: 100%;" onclick="generateListInWidget('${widgetId}')">
+                🚀 ${allTexts.generate_list_table}
+            </button>
+        </div>
+    `;
+}
+
+// 获取交叉表配置HTML
+function getCrossConfigHTML(widgetId) {
+    if (!selectedFileId) {
+        return '<div class="config-section"><p style="color: #f56565;">' + allTexts.select_data_file_first + '</p></div>';
+    }
+    
+    // 初始化该部件的字段配置
+    if (!widgetConfigs[widgetId].fields) {
+        widgetConfigs[widgetId].fields = {
+            rows: [],
+            columns: [],
+            values: []
+        };
+    }
+    
+    const config = widgetConfigs[widgetId];
+    const hasMetadata = config.metadata;
+    
+    return `
+        <div class="config-section" style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; color: #2d3748;">📊 ${allTexts.cross_table_config}</h4>
+            ${hasMetadata ? '<button class="btn-properties" onclick="showWidgetProperties(\'' + widgetId + '\')">📊 ' + allTexts.properties + '</button>' : ''}
+        </div>
+        
+        <div class="config-section">
+            <p style="font-size: 12px; color: #718096; margin: 0;">${allTexts.from_left_drag_dim_to_row}</p>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.row_fields}</label>
+            <div class="widget-drop-zone" id="widgetRows_${widgetId}" 
+                 ondrop="widgetDrop(event, '${widgetId}', 'rows')" 
+                 ondragover="allowDrop(event)">
+                <span class="drop-hint">${allTexts.drag_field_here}</span>
+            </div>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.column_fields}</label>
+            <div class="widget-drop-zone" id="widgetColumns_${widgetId}" 
+                 ondrop="widgetDrop(event, '${widgetId}', 'columns')" 
+                 ondragover="allowDrop(event)">
+                <span class="drop-hint">${allTexts.drag_field_here}</span>
+            </div>
+        </div>
+        
+        <div class="config-section">
+            <label class="config-label">${allTexts.value_fields}</label>
+            <div class="widget-drop-zone" id="widgetValues_${widgetId}" 
+                 ondrop="widgetDrop(event, '${widgetId}', 'values')" 
+                 ondragover="allowDrop(event)">
+                <span class="drop-hint">${allTexts.drag_field_here}</span>
+            </div>
+        </div>
+        
+        <div class="config-section">
+            <button class="btn btn-primary" style="width: 100%;" onclick="generateCrossInWidget('${widgetId}')">
+                🚀 ${allTexts.generate_cross_table}
+            </button>
+        </div>
+    `;
+}
+
+// 添加联合图度量
+function addComboMeasure(widgetId) {
+    const config = widgetConfigs[widgetId];
+    if (!config.comboMeasures) {
+        config.comboMeasures = [];
+    }
+    
+    const measureIndex = config.comboMeasures.length;
+    config.comboMeasures.push({
+        field: '',
+        aggregation: 'sum',
+        chart_type: 'bar'
+    });
+    
+    const container = document.getElementById(`comboMeasuresContainer_${widgetId}`);
+    const measureDiv = document.createElement('div');
+    measureDiv.className = 'combo-measure-item';
+    measureDiv.style.cssText = 'padding: 10px; background: #f7fafc; border-radius: 4px; margin-top: 10px;';
+    
+    measureDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-weight: 600; font-size: 12px;">度量 ${measureIndex + 1}</span>
+            <button onclick="removeComboMeasure('${widgetId}', ${measureIndex})" style="background: #f56565; color: white; border: none; border-radius: 3px; padding: 2px 8px; cursor: pointer;">×</button>
+        </div>
+        <select id="comboMeasureField_${widgetId}_${measureIndex}" class="config-select" style="margin-bottom: 5px;" onchange="updateComboMeasure('${widgetId}', ${measureIndex}, 'field', this.value)">
+            <option value="">-- 选择字段 --</option>
+            ${currentColumns.measures.map(col => `<option value="${col}">${col}</option>`).join('')}
+        </select>
+        <select id="comboMeasureAgg_${widgetId}_${measureIndex}" class="config-select" style="margin-bottom: 5px;" onchange="updateComboMeasure('${widgetId}', ${measureIndex}, 'aggregation', this.value)">
+            <option value="sum">求和</option>
+            <option value="avg">平均</option>
+            <option value="count">计数</option>
+            <option value="max">最大值</option>
+            <option value="min">最小值</option>
+        </select>
+        <select id="comboMeasureType_${widgetId}_${measureIndex}" class="config-select" onchange="updateComboMeasure('${widgetId}', ${measureIndex}, 'chart_type', this.value)">
+            <option value="bar">柱状图</option>
+            <option value="line">折线图</option>
+        </select>
+    `;
+    
+    container.insertBefore(measureDiv, container.querySelector('button'));
+}
+
+// 更新联合图度量
+function updateComboMeasure(widgetId, index, key, value) {
+    const config = widgetConfigs[widgetId];
+    if (config.comboMeasures && config.comboMeasures[index]) {
+        config.comboMeasures[index][key] = value;
+    }
+}
+
+// 移除联合图度量
+function removeComboMeasure(widgetId, index) {
+    const config = widgetConfigs[widgetId];
+    if (config.comboMeasures) {
+        config.comboMeasures.splice(index, 1);
+        // 重新渲染
+        updateChartConfigOptions(widgetId);
+    }
+}
+
+// 在部件中生成图表
+function generateChartInWidget(widgetId) {
+    const chartType = document.getElementById('leftChartType').value;
+    const theme = document.getElementById('leftChartTheme').value;
+    
+    if (!chartType) {
+        alert('请选择图表类型');
+        return;
+    }
+    
+    if (!selectedFileId) {
+        alert('请先选择数据文件');
+        return;
+    }
+    
+    // 显示加载状态
+    const widget = document.getElementById(widgetId);
+    const content = widget.querySelector('.widget-content');
+    content.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><p>⏳ 正在生成图表...</p></div>';
+    
+    // 根据图表类型调用不同的API
+    if (chartType === 'wordcloud') {
+        generateWordcloudInWidget(widgetId, theme);
+    } else if (chartType === 'sunburst') {
+        generateSunburstInWidget(widgetId, theme);
+    } else if (chartType === 'combo_single' || chartType === 'combo_dual') {
+        generateComboInWidget(widgetId, chartType, theme);
+    } else {
+        generateRegularChartInWidget(widgetId, chartType, theme);
+    }
+}
+
+// 生成词云图
+function generateWordcloudInWidget(widgetId, theme) {
+    const textField = document.getElementById('leftWordcloudTextField').value;
+    const weightField = document.getElementById('leftWordcloudWeightField').value;
+    const shape = document.getElementById('leftWordcloudShape').value;
+    
+    if (!textField) {
+        alert('请选择文本字段');
+        return;
+    }
+    
+    fetch('/api/chart/wordcloud/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            text_field: textField,
+            weight_field: weightField || null,
+            shape: shape,
+            theme: theme
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayChartInWidget(widgetId, data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 生成旭日图
+function generateSunburstInWidget(widgetId, theme) {
+    const config = widgetConfigs[widgetId];
+    const rows = config.fields?.rows || [];
+    const values = config.fields?.values || [];
+    
+    if (rows.length === 0) {
+        alert('旭日图需要至少一个维度字段（层级）');
+        return;
+    }
+    
+    if (values.length === 0) {
+        alert('旭日图需要一个度量字段（值）');
+        return;
+    }
+    
+    fetch('/api/chart/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            chart_type: 'sunburst',
+            rows: rows,
+            values: values,
+            theme: theme
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayChartInWidget(widgetId, data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 生成联合图
+function generateComboInWidget(widgetId, chartType, theme) {
+    const dimension = document.getElementById('leftComboDimension').value;
+    const config = widgetConfigs[widgetId];
+    const measures = config.comboMeasures || [];
+    
+    if (!dimension) {
+        alert('请选择维度字段（X轴）');
+        return;
+    }
+    
+    if (measures.length === 0) {
+        alert('请至少添加一个度量字段');
+        return;
+    }
+    
+    // 验证所有度量都已配置
+    for (let i = 0; i < measures.length; i++) {
+        if (!measures[i].field) {
+            alert(`请为度量 ${i + 1} 选择字段`);
+            return;
+        }
+    }
+    
+    fetch('/api/chart/combo/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            chart_type: chartType,
+            dimension: dimension,
+            measures: measures,
+            theme: theme
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayChartInWidget(widgetId, data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 生成常规图表
+function generateRegularChartInWidget(widgetId, chartType, theme) {
+    const xAxis = document.getElementById('leftChartXAxis').value;
+    const yAxis = document.getElementById('leftChartYAxis').value;
+    const groupField = document.getElementById('leftChartGroupField')?.value || '';
+    
+    if (!xAxis || !yAxis) {
+        alert('请选择X轴和Y轴字段');
+        return;
+    }
+    
+    fetch('/api/chart/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            chart_type: chartType,
+            x_axis: xAxis,
+            y_axis: yAxis,
+            group_field: groupField,
+            theme: theme
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayChartInWidget(widgetId, data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 在部件中显示图表
+function displayChartInWidget(widgetId, data) {
+    const widget = document.getElementById(widgetId);
+    const content = widget.querySelector('.widget-content');
+    
+    // 检查是否是HTML类型的图表（旭日图、地图等）
+    if (data.is_html || data.chart_type === 'sunburst' || data.chart_type === 'map') {
+        // HTML类型图表使用iframe显示，移除padding让iframe完全填充
+        content.style.padding = '0';
+        let iframeSrc = '';
+        if (data.chart_url) {
+            // 地图等使用chart_url
+            iframeSrc = data.chart_url;
+        } else if (data.filename) {
+            // 旭日图等使用filename
+            iframeSrc = `/charts/${data.filename}`;
+        }
+        
+        // 创建iframe并添加加载完成监听
+        const iframe = document.createElement('iframe');
+        iframe.src = iframeSrc;
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+        
+        // iframe加载完成后触发内部图表的resize
+        iframe.onload = function() {
+            try {
+                // 尝试访问iframe内容并触发resize
+                setTimeout(function() {
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.dispatchEvent(new Event('resize'));
+                    }
+                }, 200);
+            } catch (e) {
+                console.log('无法访问iframe内容（可能是跨域限制）');
+            }
+        };
+        
+        content.innerHTML = '';
+        content.appendChild(iframe);
+    } else {
+        // 其他图表使用base64图片，恢复padding
+        content.style.padding = '15px';
+        content.innerHTML = `<img src="${data.image}" style="width: 100%; height: 100%; object-fit: contain;">`;
+    }
+    
+    // 保存配置
+    widgetConfigs[widgetId].chartGenerated = true;
+}
+
+// 富文本格式化函数
+function formatText(command, value = null) {
+    // 确保编辑器获得焦点
+    const editor = document.getElementById('richTextEditor');
+    if (!editor) return;
+    
+    editor.focus();
+    
+    // 执行格式化命令
+    if (value) {
+        document.execCommand(command, false, value);
+    } else {
+        document.execCommand(command, false, null);
+    }
+    
+    // 重置选择框的值（可选）
+    if (command === 'fontSize' || command === 'fontName') {
+        setTimeout(() => {
+            const select = event.target;
+            if (select && select.tagName === 'SELECT') {
+                select.selectedIndex = 0;
+            }
+        }, 100);
+    }
+}
+
+// 在部件中保存文本
+function saveTextInWidget(widgetId) {
+    const editor = document.getElementById('richTextEditor');
+    if (!editor) {
+        alert('找不到文本编辑器');
+        return;
+    }
+    
+    const htmlContent = editor.innerHTML;
+    
+    const config = widgetConfigs[widgetId];
+    config.config.html = htmlContent;
+    config.config.text = editor.innerText; // 保存纯文本备份
+    
+    // 更新部件显示
+    const widget = document.getElementById(widgetId);
+    const content = widget.querySelector('.widget-content');
+    content.innerHTML = `<div style="padding: 15px; overflow: auto; height: 100%;">${htmlContent}</div>`;
+    
+    alert('✅ 文本已保存');
+}
+
+// 在部件中上传图片
+function uploadImageInWidget(widgetId) {
+    const fileInput = document.getElementById('leftImageFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert(allTexts.please_select_image);
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const config = widgetConfigs[widgetId];
+        config.config.imageUrl = e.target.result;
+        
+        // 更新部件显示
+        const widget = document.getElementById(widgetId);
+        const content = widget.querySelector('.widget-content');
+        content.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: contain;">`;
+        
+        alert('图片已上传');
+    };
+    reader.readAsDataURL(file);
+}
+
+// 部件拖拽处理
+function widgetDrop(event, widgetId, zone) {
+    event.preventDefault();
+    
+    // 获取字段数据（兼容两种格式）
+    const fieldName = event.dataTransfer.getData('columnName') || event.dataTransfer.getData('text/plain');
+    const fieldType = event.dataTransfer.getData('columnType') || event.dataTransfer.getData('field-type');
+    
+    if (!fieldName) return;
+    
+    const config = widgetConfigs[widgetId];
+    if (!config.fields) {
+        config.fields = { rows: [], columns: [], values: [] };
+    }
+    
+    // 添加字段到相应区域
+    if (!config.fields[zone].includes(fieldName)) {
+        config.fields[zone].push(fieldName);
+    }
+    
+    // 更新显示（包括旭日图的特殊drop zone）
+    const chartType = config.chartType;
+    if (chartType === 'sunburst') {
+        updateWidgetDropZone(widgetId, zone, 'widgetSunburst');
+    } else {
+        updateWidgetDropZone(widgetId, zone);
+    }
+}
+
+// 更新部件拖拽区域显示
+function updateWidgetDropZone(widgetId, zone, prefix = 'widget') {
+    // 构建drop zone的ID
+    const capitalizedZone = zone.charAt(0).toUpperCase() + zone.slice(1);
+    const dropZoneId = `${prefix}${capitalizedZone}_${widgetId}`;
+    const dropZone = document.getElementById(dropZoneId);
+    
+    if (!dropZone) return;
+    
+    const config = widgetConfigs[widgetId];
+    const fields = config.fields ? config.fields[zone] : [];
+    
+    if (!fields || fields.length === 0) {
+        dropZone.innerHTML = '<span class="drop-hint">拖拽字段到此处</span>';
+        return;
+    }
+    
+    let html = '';
+    fields.forEach((field, index) => {
+        html += `
+            <div class="field-tag" style="display: inline-flex; align-items: center; background: #e2e8f0; padding: 5px 10px; margin: 3px; border-radius: 4px; font-size: 12px;">
+                <span>${field}</span>
+                <button onclick="removeWidgetField('${widgetId}', '${zone}', ${index})" 
+                        style="background: none; border: none; color: #e53e3e; margin-left: 8px; cursor: pointer; font-weight: bold;">×</button>
+            </div>
+        `;
+    });
+    
+    dropZone.innerHTML = html;
+}
+
+// 从部件中移除字段
+function removeWidgetField(widgetId, zone, index) {
+    const config = widgetConfigs[widgetId];
+    if (config.fields && config.fields[zone]) {
+        config.fields[zone].splice(index, 1);
+        
+        // 根据图表类型更新显示
+        const chartType = config.chartType;
+        if (chartType === 'sunburst') {
+            updateWidgetDropZone(widgetId, zone, 'widgetSunburst');
+        } else {
+            updateWidgetDropZone(widgetId, zone);
+        }
+    }
+}
+
+// 在部件中生成清单表
+function generateListInWidget(widgetId) {
+    if (!selectedFileId) {
+        alert('请先选择数据文件');
+        return;
+    }
+    
+    const config = widgetConfigs[widgetId];
+    const fields = config.fields || { rows: [], columns: [], values: [] };
+    
+    showLoading('正在生成清单表...');
+    
+    fetch('/api/table/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            table_type: 'list',
+            rows: fields.rows,
+            columns: fields.columns,
+            values: fields.values
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            displayTableInWidget(widgetId, data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 在部件中生成交叉表
+function generateCrossInWidget(widgetId) {
+    if (!selectedFileId) {
+        alert('请先选择数据文件');
+        return;
+    }
+    
+    const config = widgetConfigs[widgetId];
+    const fields = config.fields || { rows: [], columns: [], values: [] };
+    
+    // 验证必要字段
+    if (fields.values.length === 0) {
+        alert('交叉表需要至少一个值字段');
+        return;
+    }
+    
+    if (fields.rows.length === 0 && fields.columns.length === 0) {
+        alert('交叉表需要至少一个行字段或列字段');
+        return;
+    }
+    
+    showLoading('正在生成交叉表...');
+    
+    fetch('/api/table/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            table_type: 'cross',
+            rows: fields.rows,
+            columns: fields.columns,
+            values: fields.values
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            displayTableInWidget(widgetId, data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 在部件中显示表格
+function displayTableInWidget(widgetId, data) {
+    const widget = document.getElementById(widgetId);
+    const content = widget.querySelector('.widget-content');
+    
+    // 保存表格元数据到配置中
+    const config = widgetConfigs[widgetId];
+    if (config) {
+        config.metadata = {
+            table_type: data.table_type,
+            total_rows: data.total_rows,
+            displayed_rows: data.displayed_rows,
+            columns: data.columns,
+            generated_at: new Date().toLocaleString('zh-CN')
+        };
+    }
+    
+    // 只显示表格，不显示标题信息（保持简洁）
+    let html = '<div class="widget-table-container" style="width: 100%; height: 100%; overflow: auto;">';
+    html += '<table class="widget-data-table" style="width: 100%; border-collapse: collapse; font-size: 12px;">';
+    
+    // 表头
+    html += '<thead><tr>';
+    data.columns.forEach(col => {
+        html += `<th style="background: #f7fafc; border: 1px solid #e2e8f0; padding: 8px; text-align: left; font-weight: 600; color: #2d3748;">${col}</th>`;
+    });
+    html += '</tr></thead>';
+    
+    // 表体
+    html += '<tbody>';
+    data.data.forEach(row => {
+        html += '<tr>';
+        row.forEach(cell => {
+            const displayValue = typeof cell === 'number' ? cell.toLocaleString() : cell;
+            html += `<td style="border: 1px solid #e2e8f0; padding: 8px; color: #4a5568;">${displayValue}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody>';
+    
+    html += '</table></div>';
+    
+    content.innerHTML = html;
+}
+
+// 删除部件
+function deleteWidget(widgetId) {
+    if (confirm('确定要删除这个部件吗？')) {
+        document.getElementById(widgetId).remove();
+        delete widgetConfigs[widgetId];
+        
+        // 如果删除的是当前选中的部件，关闭配置面板
+        if (selectedWidgetId === widgetId) {
+            closeLeftConfig();
+        }
+        
+        // 检查画布是否为空，如果为空则显示占位符
+        const canvas = document.getElementById('dashboardCanvas');
+        if (canvas.children.length === 0) {
+            canvas.innerHTML = `
+                <div class="canvas-placeholder">
+                    <div class="placeholder-icon">📊</div>
+                    <p>请从上方拖拽部件到此处创建仪表盘</p>
+                    <p class="placeholder-hint">支持清单表、交叉表、图形、文本和图片</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// 打开图表配置
+function openChartConfig(widgetId) {
+    if (!selectedFileId) {
+        alert('请先选择数据文件');
+        return;
+    }
+    document.getElementById('chartConfigModal').style.display = 'flex';
+}
+
+// 关闭图表配置
+function closeChartConfig(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('chartConfigModal').style.display = 'none';
+}
+
+// 显示部件属性
+function showWidgetProperties(widgetId) {
+    const config = widgetConfigs[widgetId];
+    if (!config || !config.metadata) {
+        alert('暂无属性信息');
+        return;
+    }
+    
+    const metadata = config.metadata;
+    const typeText = metadata.table_type === 'list' ? '清单表' : '交叉表';
+    const typeIcon = metadata.table_type === 'list' ? '📋' : '📊';
+    
+    // 创建弹窗
+    const modal = document.createElement('div');
+    modal.className = 'properties-modal-overlay';
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            closePropertiesModal();
+        }
+    };
+    
+    const modalContent = document.createElement('div');
+    modalContent.className = 'properties-modal-content';
+    modalContent.onclick = function(e) {
+        e.stopPropagation();
+    };
+    
+    let html = `
+        <div class="properties-modal-header">
+            <h3>${typeIcon} ${typeText}属性</h3>
+            <button class="properties-modal-close" onclick="closePropertiesModal()">&times;</button>
+        </div>
+        <div class="properties-modal-body">
+            <div class="property-item">
+                <span class="property-label">类型：</span>
+                <span class="property-value">${typeIcon} ${typeText}</span>
+            </div>
+            <div class="property-item">
+                <span class="property-label">总行数：</span>
+                <span class="property-value">${metadata.total_rows} 行</span>
+            </div>
+    `;
+    
+    if (metadata.displayed_rows) {
+        html += `
+            <div class="property-item">
+                <span class="property-label">显示行数：</span>
+                <span class="property-value">${metadata.displayed_rows} 行</span>
+            </div>
+        `;
+    }
+    
+    html += `
+            <div class="property-item">
+                <span class="property-label">列数：</span>
+                <span class="property-value">${metadata.columns.length} 列</span>
+            </div>
+            <div class="property-item">
+                <span class="property-label">列名：</span>
+                <span class="property-value">${metadata.columns.join(', ')}</span>
+            </div>
+            <div class="property-item">
+                <span class="property-label">生成时间：</span>
+                <span class="property-value">${metadata.generated_at}</span>
+            </div>
+        </div>
+        <div class="properties-modal-footer">
+            <button class="btn btn-secondary" onclick="closePropertiesModal()">关闭</button>
+        </div>
+    `;
+    
+    modalContent.innerHTML = html;
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+}
+
+// 关闭属性弹窗
+function closePropertiesModal() {
+    const modal = document.querySelector('.properties-modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// 打开文本编辑
+function openTextEdit(widgetId) {
+    const config = widgetConfigs[widgetId];
+    document.getElementById('textContentInput').value = config.config.text || '';
+    document.getElementById('textFontSizeSelect').value = config.config.fontSize || '16';
+    document.getElementById('textEditModal').style.display = 'flex';
+}
+
+// 关闭文本编辑
+function closeTextEdit(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('textEditModal').style.display = 'none';
+}
+
+// 保存文本内容
+function saveTextContent() {
+    const text = document.getElementById('textContentInput').value;
+    const fontSize = document.getElementById('textFontSizeSelect').value;
+    
+    const config = widgetConfigs[currentEditingWidget];
+    config.config.text = text;
+    config.config.fontSize = fontSize;
+    
+    // 更新部件显示
+    const widget = document.getElementById(currentEditingWidget);
+    const content = widget.querySelector('.widget-content');
+    content.innerHTML = `<div style="font-size: ${fontSize}px; padding: 10px;">${text}</div>`;
+    
+    closeTextEdit();
+}
+
+// 打开图片上传
+function openImageUpload(widgetId) {
+    document.getElementById('imageUploadModal').style.display = 'flex';
+}
+
+// 关闭图片上传
+function closeImageUpload(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('imageUploadModal').style.display = 'none';
+}
+
+// 上传图片
+function uploadImage() {
+    const fileInput = document.getElementById('imageFileInput');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert(allTexts.please_select_image);
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const config = widgetConfigs[currentEditingWidget];
+        config.config.imageUrl = e.target.result;
+        
+        // 更新部件显示
+        const widget = document.getElementById(currentEditingWidget);
+        const content = widget.querySelector('.widget-content');
+        content.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: contain;">`;
+        
+        closeImageUpload();
+    };
+    reader.readAsDataURL(file);
+}
+
+// 使部件可拖拽
+function makeWidgetDraggable(widget) {
+    let isDragging = false;
+    let hasMoved = false;
+    let currentX, currentY, initialX, initialY;
+    let startX, startY;
+    
+    widget.addEventListener('mousedown', dragStart);
+    
+    function dragStart(e) {
+        // 如果点击的是按钮或调整手柄，不处理
+        if (e.target.classList.contains('widget-tool-btn') || 
+            e.target.classList.contains('resizer') ||
+            e.target.closest('.widget-tool-btn') ||
+            e.target.closest('.resizer')) {
+            return;
+        }
+        
+        // 记录起始位置
+        startX = e.clientX;
+        startY = e.clientY;
+        initialX = e.clientX - widget.offsetLeft;
+        initialY = e.clientY - widget.offsetTop;
+        hasMoved = false;
+        
+        // 添加移动监听
+        document.addEventListener('mousemove', checkDrag);
+        document.addEventListener('mouseup', dragEnd);
+    }
+    
+    function checkDrag(e) {
+        // 计算移动距离
+        const deltaX = Math.abs(e.clientX - startX);
+        const deltaY = Math.abs(e.clientY - startY);
+        
+        // 如果移动超过5像素，认为是拖拽
+        if (deltaX > 5 || deltaY > 5) {
+            if (!isDragging) {
+                isDragging = true;
+                hasMoved = true;
+                widget.style.cursor = 'move';
+                // 移除检查监听，添加拖拽监听
+                document.removeEventListener('mousemove', checkDrag);
+                document.addEventListener('mousemove', drag);
+            }
+        }
+    }
+    
+    function drag(e) {
+        if (!isDragging) return;
+        
+        e.preventDefault();
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+        
+        widget.style.left = currentX + 'px';
+        widget.style.top = currentY + 'px';
+    }
+    
+    function dragEnd(e) {
+        document.removeEventListener('mousemove', checkDrag);
+        document.removeEventListener('mousemove', drag);
+        document.removeEventListener('mouseup', dragEnd);
+        
+        isDragging = false;
+        widget.style.cursor = 'pointer';
+        
+        // 如果没有移动，触发点击选中
+        if (!hasMoved) {
+            selectWidget(widget.id);
+        }
+        
+        hasMoved = false;
+    }
+}
+
+// 使部件可调整大小
+function makeWidgetResizable(widget) {
+    const resizers = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
+    
+    resizers.forEach(pos => {
+        const resizer = document.createElement('div');
+        resizer.className = `resizer resizer-${pos}`;
+        widget.appendChild(resizer);
+        
+        resizer.addEventListener('mousedown', function(e) {
+            e.stopPropagation();
+            initResize(e, widget, pos);
+        });
+    });
+}
+
+// 初始化调整大小
+function initResize(e, widget, position) {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = widget.offsetWidth;
+    const startHeight = widget.offsetHeight;
+    const startLeft = widget.offsetLeft;
+    const startTop = widget.offsetTop;
+    
+    function resize(e) {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        
+        if (position.includes('e')) {
+            widget.style.width = (startWidth + dx) + 'px';
+        }
+        if (position.includes('s')) {
+            widget.style.height = (startHeight + dy) + 'px';
+        }
+        if (position.includes('w')) {
+            widget.style.width = (startWidth - dx) + 'px';
+            widget.style.left = (startLeft + dx) + 'px';
+        }
+        if (position.includes('n')) {
+            widget.style.height = (startHeight - dy) + 'px';
+            widget.style.top = (startTop + dy) + 'px';
+        }
+    }
+    
+    function stopResize() {
+        document.removeEventListener('mousemove', resize);
+        document.removeEventListener('mouseup', stopResize);
+        
+        // 调整完成后，触发iframe内部图表的resize
+        const iframe = widget.querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+            try {
+                setTimeout(function() {
+                    iframe.contentWindow.dispatchEvent(new Event('resize'));
+                }, 100);
+            } catch (e) {
+                console.log('无法触发iframe内部resize');
+            }
+        }
+    }
+    
+    document.addEventListener('mousemove', resize);
+    document.addEventListener('mouseup', stopResize);
+}
+
+// 切换字段组
+function toggleFieldGroup(groupName) {
+    const list = document.getElementById(groupName + 'List');
+    const icon = event.target.querySelector('.collapse-icon');
+    
+    if (list.style.display === 'none') {
+        list.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        list.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+// 加载提示
+function showLoading(message) {
+    // 创建加载提示元素
+    let loadingDiv = document.getElementById('loadingOverlay');
+    if (!loadingDiv) {
+        loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loadingOverlay';
+        loadingDiv.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        `;
+        
+        const loadingContent = document.createElement('div');
+        loadingContent.style.cssText = `
+            background: white;
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        `;
+        
+        const spinner = document.createElement('div');
+        spinner.style.cssText = `
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        `;
+        
+        const messageSpan = document.createElement('span');
+        messageSpan.id = 'loadingMessage';
+        messageSpan.style.cssText = 'font-size: 16px; color: #333;';
+        messageSpan.textContent = message || '加载中...';
+        
+        loadingContent.appendChild(spinner);
+        loadingContent.appendChild(messageSpan);
+        loadingDiv.appendChild(loadingContent);
+        document.body.appendChild(loadingDiv);
+        
+        // 添加旋转动画
+        const style = document.createElement('style');
+        style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+    } else {
+        const messageSpan = document.getElementById('loadingMessage');
+        if (messageSpan) {
+            messageSpan.textContent = message || '加载中...';
+        }
+        loadingDiv.style.display = 'flex';
+    }
+}
+
+function hideLoading() {
+    const loadingDiv = document.getElementById('loadingOverlay');
+    if (loadingDiv) {
+        loadingDiv.style.display = 'none';
+    }
+}
+
+// 生成图表
+function generateChart() {
+    alert('图表生成功能将连接到现有的图表生成API');
+    closeChartConfig();
+}
+
+// 页面加载完成
+document.addEventListener('DOMContentLoaded', function() {
+    // 为文件列表项添加事件监听器
+    initializeFileList();
+    
+    // 如果有文件，自动选择第一个
+    const fileList = document.getElementById('fileList');
+    const firstFile = fileList.querySelector('.file-list-item');
+    if (firstFile) {
+        const fileId = firstFile.dataset.fileId;
+        selectFile(fileId);
+    }
+});
+
+// 初始化文件列表事件
+function initializeFileList() {
+    const fileList = document.getElementById('fileList');
+    const fileItems = fileList.querySelectorAll('.file-list-item');
+    
+    fileItems.forEach(item => {
+        const fileId = item.dataset.fileId;
+        
+        // 点击文件项选择文件
+        item.addEventListener('click', function(e) {
+            // 如果点击的是删除按钮，不触发选择
+            if (e.target.classList.contains('file-delete-btn')) {
+                return;
+            }
+            selectFile(fileId);
+        });
+        
+        // 删除按钮事件
+        const deleteBtn = item.querySelector('.file-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                deleteFile(fileId, e);
+            });
+        }
+    });
+}
+</script>
+
+<style>
+/* 新仪表盘样式 */
+.dashboard-new-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+}
+
+/* 顶部头部 */
+.top-header {
+    background: #2c5aa0;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.app-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.welcome-text {
+    margin-right: 15px;
+}
+
+.btn-classic-mode {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background 0.3s;
+    margin-right: 15px;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.btn-classic-mode:hover {
+    background: rgba(255,255,255,0.35);
+    border-color: rgba(255,255,255,0.5);
+}
+
+.btn-logout {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background 0.3s;
+}
+
+.btn-logout:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+/* 仪表盘模式的语言切换按钮样式（深色背景适配） */
+.dashboard-new-container .btn-lang {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.dashboard-new-container .btn-lang:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.dashboard-new-container .btn-lang.active {
+    background: white;
+    color: #2c5aa0;
+    border-color: white;
+}
+
+/* 主布局 */
+.main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* 左侧边栏 */
+.left-sidebar {
+    width: 280px;
+    background: white;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-panel {
+    border-bottom: 1px solid #e0e0e0;
+    padding: 15px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+    font-weight: 600;
+    position: relative;
+}
+
+.panel-header .icon {
+    font-size: 18px;
+}
+
+.close-config-btn {
+    position: absolute;
+    right: 0;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.close-config-btn:hover {
+    color: #f56565;
+}
+
+.config-content {
+    padding-top: 10px;
+}
+
+.config-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.config-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* 上传按钮 */
+.upload-section {
+    margin-bottom: 15px;
+}
+
+.btn-upload {
+    width: 100%;
+    padding: 10px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.btn-upload:hover {
+    background: #45a049;
+}
+
+/* 文件列表 */
+.file-list-section {
+    margin-top: 10px;
+}
+
+.file-list-header {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.file-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.file-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.file-list-item:last-child {
+    border-bottom: none;
+}
+
+.file-list-item:hover {
+    background: #f5f5f5;
+}
+
+.file-list-item.selected {
+    background: #e3f2fd;
+    border-left: 3px solid #2196F3;
+}
+
+.file-list-item .file-name {
+    flex: 1;
+    font-size: 13px;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 8px;
+}
+
+.file-list-item.selected .file-name {
+    color: #1976D2;
+    font-weight: 600;
+}
+
+.file-delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    opacity: 0.6;
+}
+
+.file-delete-btn:hover {
+    background: #ffebee;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.file-list-empty {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+}
+
+/* 字段列表 */
+.field-group {
+    margin-bottom: 10px;
+}
+
+.field-group-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.field-group-header:hover {
+    background: #e8e8e8;
+}
+
+.collapse-icon {
+    font-size: 10px;
+}
+
+.field-list {
+    padding: 5px 0;
+}
+
+.field-item {
+    padding: 8px 12px;
+    margin: 2px 0;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    cursor: move;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.field-item:hover {
+    background: #e3f2fd;
+    border-color: #2196F3;
+}
+
+/* 中间内容区域 */
+.center-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 部件工具栏 */
+.widget-toolbar {
+    background: white;
+    border-bottom: 1px solid #ddd;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.toolbar-label {
+    font-weight: 600;
+    font-size: 14px;
+    color: #666;
+}
+
+.widget-items {
+    display: flex;
+    gap: 10px;
+}
+
+.widget-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f5f5f5;
+    border: 2px dashed #ccc;
+    border-radius: 6px;
+    cursor: move;
+    transition: all 0.3s;
+    min-width: 70px;
+}
+
+.widget-item:hover {
+    background: #e3f2fd;
+    border-color: #2196F3;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+.widget-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.widget-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* 仪表盘画布 */
+.dashboard-canvas {
+    flex: 1;
+    background: #fafafa;
+    position: relative;
+    overflow: auto;
+    padding: 20px;
+}
+
+.canvas-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #999;
+}
+
+.placeholder-icon {
+    font-size: 64px;
+    margin-bottom: 15px;
+}
+
+.canvas-placeholder p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.placeholder-hint {
+    font-size: 12px !important;
+    color: #bbb;
+}
+
+.usage-tips {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-align: left;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.usage-tips p {
+    margin: 8px 0;
+    font-size: 13px;
+    color: #666;
+}
+
+.usage-tips p:first-child {
+    color: #333;
+    margin-bottom: 12px;
+}
+
+/* 仪表盘部件 */
+.dashboard-widget {
+    position: absolute;
+    min-width: 50px;  /* 最小宽度，避免完全消失 */
+    min-height: 50px;  /* 最小高度，避免完全消失 */
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dashboard-widget:hover {
+    border-color: #2196F3;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+}
+
+.dashboard-widget.widget-selected {
+    border: 3px solid #2196F3;
+    box-shadow: 0 4px 16px rgba(33, 150, 243, 0.4);
+}
+
+/* 隐藏旧的头部 */
+.widget-header {
+    display: none;
+}
+
+/* 悬停工具栏 */
+.widget-toolbar-hover {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: none;
+    gap: 5px;
+    z-index: 10;
+}
+
+.dashboard-widget:hover .widget-toolbar-hover {
+    display: flex;
+}
+
+.widget-tool-btn {
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.widget-tool-btn:hover {
+    background: #f56565;
+    color: white;
+    border-color: #f56565;
+}
+
+/* 部件类型标签（悬停显示） */
+.widget-type-label {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 18px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 5;
+    display: none;
+}
+
+.dashboard-widget:hover .widget-type-label {
+    display: block;
+}
+
+.widget-content {
+    flex: 1;
+    padding: 15px;
+    overflow: auto;
+}
+
+.widget-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #999;
+    font-size: 14px;
+}
+
+/* 调整大小手柄 */
+.resizer {
+    position: absolute;
+    background: #2196F3;
+    opacity: 0;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.dashboard-widget:hover .resizer {
+    opacity: 0.6;
+}
+
+.resizer:hover {
+    opacity: 1 !important;
+    background: #1976D2;
+    transform: scale(1.2);
+}
+
+/* 上下左右调整手柄 - 更宽更明显 */
+.resizer-n { 
+    top: -4px; 
+    left: 5%; 
+    right: 5%; 
+    height: 8px; 
+    cursor: ns-resize;
+    border-radius: 4px;
+}
+
+.resizer-s { 
+    bottom: -4px; 
+    left: 5%; 
+    right: 5%; 
+    height: 8px; 
+    cursor: ns-resize;
+    border-radius: 4px;
+}
+
+.resizer-e { 
+    right: -4px; 
+    top: 5%; 
+    bottom: 5%; 
+    width: 8px; 
+    cursor: ew-resize;
+    border-radius: 4px;
+}
+
+.resizer-w { 
+    left: -4px; 
+    top: 5%; 
+    bottom: 5%; 
+    width: 8px; 
+    cursor: ew-resize;
+    border-radius: 4px;
+}
+
+/* 四角调整手柄 - 更大更明显 */
+.resizer-nw { 
+    top: -5px; 
+    left: -5px; 
+    width: 14px; 
+    height: 14px; 
+    cursor: nwse-resize; 
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.resizer-ne { 
+    top: -5px; 
+    right: -5px; 
+    width: 14px; 
+    height: 14px; 
+    cursor: nesw-resize; 
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.resizer-sw { 
+    bottom: -5px; 
+    left: -5px; 
+    width: 14px; 
+    height: 14px; 
+    cursor: nesw-resize; 
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.resizer-se { 
+    bottom: -5px; 
+    right: -5px; 
+    width: 14px; 
+    height: 14px; 
+    cursor: nwse-resize; 
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* 选中状态下始终显示调整手柄 */
+.widget-selected .resizer {
+    opacity: 0.8;
+}
+
+.widget-selected .resizer:hover {
+    opacity: 1;
+}
+
+/* 模态框 */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+}
+
+.modal-close-btn:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.config-section {
+    margin-bottom: 20px;
+}
+
+.config-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+/* 部件拖拽区域 */
+.widget-drop-zone {
+    min-height: 50px;
+    padding: 10px;
+    border: 2px dashed #cbd5e0;
+    border-radius: 6px;
+    background: #f7fafc;
+    transition: all 0.3s;
+}
+
+.widget-drop-zone:hover {
+    border-color: #4299e1;
+    background: #ebf8ff;
+}
+
+.widget-drop-zone .drop-hint {
+    color: #a0aec0;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.field-tag {
+    display: inline-flex;
+    align-items: center;
+    background: #e2e8f0;
+    padding: 5px 10px;
+    margin: 3px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* 配置面板中的字段列表 */
+.config-fields-section {
+    margin-bottom: 15px;
+}
+
+.config-field-group {
+    margin-bottom: 10px;
+}
+
+.config-field-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #f7fafc;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: 1px solid #e2e8f0;
+}
+
+.config-field-group-header:hover {
+    background: #edf2f7;
+}
+
+.config-field-list {
+    padding: 5px 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.config-field-item {
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    cursor: move;
+    font-size: 13px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.config-field-item:hover {
+    background: #ebf8ff;
+    border-color: #4299e1;
+    box-shadow: 0 2px 4px rgba(66, 153, 225, 0.1);
+}
+
+.config-field-item:active {
+    cursor: grabbing;
+}
+
+.config-select,
+.text-input,
+.file-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.text-input {
+    resize: vertical;
+    font-family: inherit;
+}
+
+.config-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+.btn-primary {
+    background: #2196F3;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1976D2;
+}
+
+/* 属性按钮 */
+.btn-properties {
+    padding: 6px 12px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s;
+}
+
+.btn-properties:hover {
+    background: #45a049;
+    transform: scale(1.05);
+}
+
+/* 属性弹窗 */
+.properties-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.properties-modal-content {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.properties-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f5f5f5;
+}
+
+.properties-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+}
+
+.properties-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #666;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.properties-modal-close:hover {
+    background: #e0e0e0;
+    color: #333;
+}
+
+.properties-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.property-item {
+    display: flex;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.property-item:last-child {
+    border-bottom: none;
+}
+
+.property-label {
+    font-weight: 600;
+    color: #666;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.property-value {
+    color: #333;
+    flex: 1;
+    word-break: break-word;
+}
+
+.properties-modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    background: #f5f5f5;
+}
+
+/* 富文本编辑器样式 */
+.rich-text-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.toolbar-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 2px;
+    border-right: 1px solid #cbd5e0;
+}
+
+.toolbar-group:last-child {
+    border-right: none;
+}
+
+.toolbar-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 4px 8px;
+    background: white;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+    background: #edf2f7;
+    border-color: #4299e1;
+    transform: translateY(-1px);
+}
+
+.toolbar-btn:active {
+    transform: translateY(0);
+}
+
+.toolbar-select {
+    height: 32px;
+    padding: 4px 8px;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.toolbar-select:hover {
+    border-color: #4299e1;
+}
+
+.toolbar-select:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.toolbar-color-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: white;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toolbar-color-label:hover {
+    border-color: #4299e1;
+}
+
+.toolbar-color-label span {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.rich-text-editor {
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+    outline: none;
+    cursor: text;
+}
+
+.rich-text-editor:empty:before {
+    content: attr(placeholder);
+    color: #a0aec0;
+}
+
+.rich-text-editor:focus {
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+/* 编辑器内容样式 */
+.rich-text-editor p {
+    margin: 0 0 1em 0;
+}
+
+.rich-text-editor p:last-child {
+    margin-bottom: 0;
+}
+
+.rich-text-editor strong {
+    font-weight: 700;
+}
+
+.rich-text-editor em {
+    font-style: italic;
+}
+
+.rich-text-editor u {
+    text-decoration: underline;
+}
+</style>
+{% endblock %}
+

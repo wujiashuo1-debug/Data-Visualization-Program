@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}登录 - 数据可视化程序{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <!-- 语言切换按钮 -->
+    <div class="auth-lang-switcher">
+        <a href="{{ url_for('set_language', lang='zh') }}" class="lang-btn {% if lang == 'zh' %}active{% endif %}">🇨🇳 中文</a>
+        <a href="{{ url_for('set_language', lang='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}">🇺🇸 EN</a>
+    </div>
+    
+    <div class="auth-box">
+        <h1 class="auth-title">{{ texts.app_title }}</h1>
+        <h2 class="auth-subtitle">{{ texts.login if lang == 'zh' else 'User Login' }}</h2>
+        
+        <form method="POST" action="{{ url_for('login') }}" class="auth-form">
+            <div class="form-group">
+                <label for="username">{{ texts.username }}</label>
+                <input type="text" id="username" name="username" required 
+                       placeholder="{{ '请输入用户名' if lang == 'zh' else 'Enter username' }}" autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">{{ texts.password }}</label>
+                <input type="password" id="password" name="password" required 
+                       placeholder="{{ '请输入密码' if lang == 'zh' else 'Enter password' }}">
+            </div>
+
+            <button type="submit" class="btn btn-primary">{{ texts.login }}</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>{{ "还没有账号？" if lang == 'zh' else "Don't have an account?" }}<a href="{{ url_for('register') }}">{{ "立即注册" if lang == 'zh' else "Register now" }}</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

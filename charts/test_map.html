@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试中国地图显示</title>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/china.js"></script>
+</head>
+<body>
+    <div id="map" style="width:1200px; height:700px;"></div>
+    <script>
+        var chart = echarts.init(document.getElementById('map'));
+        var option = {
+            backgroundColor: "white",
+            title: {
+                text: "测试地图 - 颜色深浅显示",
+                left: "center",
+                top: "20",
+                textStyle: {
+                    color: "#333",
+                    fontWeight: "bold",
+                    fontSize: 22
+                }
+            },
+            tooltip: {
+                show: true,
+                formatter: "{b}: {c}"
+            },
+            visualMap: {
+                show: true,
+                type: "continuous",
+                min: 1000,
+                max: 6000,
+                left: "20",
+                bottom: "10%",
+                textStyle: {
+                    color: "#333",
+                    fontSize: 12
+                },
+                inRange: {
+                    color: [
+                        "#D4E6F9",  // 极浅蓝
+                        "#7CB9E8",  // 浅蓝
+                        "#4682B4",  // 钢蓝
+                        "#1E90FF",  // 道奇蓝
+                        "#0047AB",  // 钴蓝
+                        "#00008B"   // 深蓝
+                    ]
+                },
+                borderColor: "#999",
+                borderWidth: 1
+            },
+            series: [{
+                type: "map",
+                name: "测试数据",
+                map: "china",
+                roam: true,
+                label: {
+                    show: true,
+                    color: "#000",
+                    fontSize: 10,
+                    formatter: "{b}"
+                },
+                itemStyle: {
+                    borderColor: "#CCCCCC",
+                    borderWidth: 0.5
+                },
+                data: [
+                    { name: "北京", value: 6000 },
+                    { name: "江苏", value: 5500 },
+                    { name: "浙江", value: 4500 },
+                    { name: "上海", value: 4000 },
+                    { name: "广东", value: 3500 },
+                    { name: "山东", value: 3000 },
+                    { name: "河北", value: 2500 },
+                    { name: "河南", value: 2000 },
+                    { name: "湖北", value: 1500 },
+                    { name: "天津", value: 1200 }
+                ]
+            }]
+        };
+        chart.setOption(option);
+        
+        // 检查是否加载成功
+        setTimeout(function() {
+            console.log("ECharts 版本:", echarts.version);
+            console.log("地图已渲染");
+        }, 1000);
+    </script>
+</body>
+</html>
+
+
+
+
+
+

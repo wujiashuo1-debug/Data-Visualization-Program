@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Awesome-pyecharts</title>
+                <script type="text/javascript" src="/static/js/echarts.min.js"></script>
+            
+
+</head>
+<body >
+    <div id="b34c4be17f5c419d8cc077303879a959" class="chart-container" style="width:1200px; height:700px; "></div>
+    <script>
+                // 同步加载中国地图GeoJSON数据
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/static/js/china.json', false);  // false = 同步请求
+        xhr.send();
+        if (xhr.status === 200) {
+            var chinaJson = JSON.parse(xhr.responseText);
+            echarts.registerMap('china', chinaJson);
+            console.log('✅ 中国地图数据加载成功');
+        } else {
+            console.error('❌ 地图数据加载失败:', xhr.status);
+        }
+        
+var chart_b34c4be17f5c419d8cc077303879a959 = echarts.init(
+            document.getElementById('b34c4be17f5c419d8cc077303879a959'), 'white', {renderer: 'canvas'});
+        var option_b34c4be17f5c419d8cc077303879a959 = {
+    "backgroundColor": "white",
+    "animation": true,
+    "animationThreshold": 2000,
+    "animationDuration": 1000,
+    "animationEasing": "cubicOut",
+    "animationDelay": 0,
+    "animationDurationUpdate": 300,
+    "animationEasingUpdate": "cubicOut",
+    "animationDelayUpdate": 0,
+    "aria": {
+        "enabled": false
+    },
+    "color": [
+        "#5470c6",
+        "#91cc75",
+        "#fac858",
+        "#ee6666",
+        "#73c0de",
+        "#3ba272",
+        "#fc8452",
+        "#9a60b4",
+        "#ea7ccc"
+    ],
+    "series": [
+        {
+            "type": "map",
+            "name": "\u9500\u552e\u989d",
+            "label": {
+                "show": true,
+                "color": "#000000",
+                "margin": 8,
+                "fontSize": 10,
+                "formatter": "{b}"
+            },
+            "map": "china",
+            "data": [
+                {
+                    "name": "\u4e0a\u6d77\u5e02",
+                    "value": 4000
+                },
+                {
+                    "name": "\u5317\u4eac\u5e02",
+                    "value": 5000
+                },
+                {
+                    "name": "\u5929\u6d25\u5e02",
+                    "value": 1200
+                },
+                {
+                    "name": "\u5e7f\u4e1c\u7701",
+                    "value": 3500
+                },
+                {
+                    "name": "\u6c5f\u82cf\u7701",
+                    "value": 5500
+                },
+                {
+                    "name": "\u6d59\u6c5f\u7701",
+                    "value": 4500
+                }
+            ],
+            "roam": true,
+            "aspectScale": 0.75,
+            "nameProperty": "name",
+            "selectedMode": false,
+            "zoom": 1,
+            "zlevel": 0,
+            "z": 2,
+            "seriesLayoutBy": "column",
+            "datasetIndex": 0,
+            "mapValueCalculation": "sum",
+            "showLegendSymbol": false,
+            "itemStyle": {
+                "borderColor": "#CCCCCC",
+                "borderWidth": 0.5
+            },
+            "emphasis": {}
+        }
+    ],
+    "legend": [
+        {
+            "data": [
+                "\u9500\u552e\u989d"
+            ],
+            "selected": {},
+            "show": true,
+            "padding": 5,
+            "itemGap": 10,
+            "itemWidth": 25,
+            "itemHeight": 14,
+            "backgroundColor": "transparent",
+            "borderColor": "#ccc",
+            "borderWidth": 1,
+            "borderRadius": 0,
+            "pageButtonItemGap": 5,
+            "pageButtonPosition": "end",
+            "pageFormatter": "{current}/{total}",
+            "pageIconColor": "#2f4554",
+            "pageIconInactiveColor": "#aaa",
+            "pageIconSize": 15,
+            "animationDurationUpdate": 800,
+            "selector": false,
+            "selectorPosition": "auto",
+            "selectorItemGap": 7,
+            "selectorButtonGap": 10
+        }
+    ],
+    "tooltip": {
+        "show": true,
+        "trigger": "item",
+        "triggerOn": "mousemove|click",
+        "axisPointer": {
+            "type": "line"
+        },
+        "showContent": true,
+        "alwaysShowContent": false,
+        "showDelay": 0,
+        "hideDelay": 100,
+        "enterable": false,
+        "confine": false,
+        "appendToBody": false,
+        "transitionDuration": 0.4,
+        "formatter": "{b}: {c}",
+        "textStyle": {
+            "fontSize": 14
+        },
+        "borderWidth": 0,
+        "padding": 5,
+        "order": "seriesAsc"
+    },
+    "title": [
+        {
+            "show": true,
+            "text": "\u7701\u4efd  - \u9500\u552e\u989d \u5730\u56fe",
+            "target": "blank",
+            "subtarget": "blank",
+            "left": "center",
+            "top": "20",
+            "padding": 5,
+            "itemGap": 10,
+            "textAlign": "auto",
+            "textVerticalAlign": "auto",
+            "triggerEvent": false,
+            "textStyle": {
+                "color": "#333333",
+                "fontWeight": "bold",
+                "fontSize": 22
+            }
+        }
+    ],
+    "visualMap": {
+        "show": true,
+        "type": "continuous",
+        "min": 1200,
+        "max": 5500,
+        "textStyle": {
+            "color": "#333333",
+            "fontSize": 12
+        },
+        "inRange": {
+            "color": [
+                "#fc8181",
+                "#f56565",
+                "#e53e3e",
+                "#c53030",
+                "#9b2c2c",
+                "#c53030"
+            ]
+        },
+        "calculable": true,
+        "inverse": false,
+        "splitNumber": 5,
+        "hoverLink": true,
+        "orient": "vertical",
+        "left": "20",
+        "bottom": "10%",
+        "padding": 5,
+        "showLabel": true,
+        "itemWidth": 20,
+        "itemHeight": 140,
+        "borderColor": "#999999",
+        "borderWidth": 1
+    }
+};
+        chart_b34c4be17f5c419d8cc077303879a959.setOption(option_b34c4be17f5c419d8cc077303879a959);
+    </script>
+</body>
+</html>

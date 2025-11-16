@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}注册 - 数据可视化程序{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <!-- 语言切换按钮 -->
+    <div class="auth-lang-switcher">
+        <a href="{{ url_for('set_language', lang='zh') }}" class="lang-btn {% if lang == 'zh' %}active{% endif %}">🇨🇳 中文</a>
+        <a href="{{ url_for('set_language', lang='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}">🇺🇸 EN</a>
+    </div>
+    
+    <div class="auth-box">
+        <h1 class="auth-title">{{ texts.app_title }}</h1>
+        <h2 class="auth-subtitle">{{ texts.register if lang == 'zh' else 'User Registration' }}</h2>
+        
+        <form method="POST" action="{{ url_for('register') }}" class="auth-form">
+            <div class="form-group">
+                <label for="username">{{ texts.username }}</label>
+                <input type="text" id="username" name="username" required 
+                       placeholder="{{ '请输入用户名' if lang == 'zh' else 'Enter username' }}" autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="email">{{ "邮箱" if lang == 'zh' else 'Email' }}</label>
+                <input type="email" id="email" name="email" required 
+                       placeholder="{{ '请输入邮箱地址' if lang == 'zh' else 'Enter email address' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="password">{{ texts.password }}</label>
+                <input type="password" id="password" name="password" required 
+                       placeholder="{{ '请输入密码' if lang == 'zh' else 'Enter password' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">{{ texts.confirm_password }}</label>
+                <input type="password" id="confirm_password" name="confirm_password" required 
+                       placeholder="{{ '请再次输入密码' if lang == 'zh' else 'Re-enter password' }}">
+            </div>
+
+            <button type="submit" class="btn btn-primary">{{ texts.register }}</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>{{ "已有账号？" if lang == 'zh' else "Already have an account?" }}<a href="{{ url_for('login') }}">{{ "立即登录" if lang == 'zh' else "Login now" }}</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

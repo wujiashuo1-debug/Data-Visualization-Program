@@ -1,0 +1,2087 @@
+{% extends "base.html" %}
+
+{% block title %}主页 - 数据可视化程序{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- 顶部导航栏 -->
+    <header class="dashboard-header">
+        <div class="header-content">
+            <h1 class="header-title">{{ texts.app_title }}</h1>
+            <div class="header-right">
+                <a href="{{ url_for('dashboard_new') }}" class="btn btn-dashboard-mode" title="{{ texts.switch_to_dashboard }}">
+                    📊 {{ texts.dashboard_mode }}
+                </a>
+                <!-- 语言切换按钮 -->
+                <div class="language-switcher">
+                    <button onclick="switchLanguage('zh')" class="btn btn-lang {% if lang == 'zh' %}active{% endif %}" id="lang-btn-zh" title="中文">
+                        🇨🇳 中文
+                    </button>
+                    <button onclick="switchLanguage('en')" class="btn btn-lang {% if lang == 'en' %}active{% endif %}" id="lang-btn-en" title="English">
+                        🇺🇸 EN
+                    </button>
+                </div>
+                <span class="welcome-text">{{ texts.welcome }}，{{ username }}</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-logout">{{ texts.logout }}</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="dashboard-body">
+        <!-- 左侧边栏 -->
+        <aside class="sidebar">
+            <!-- 数据区域 -->
+            <div class="sidebar-section">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <span class="icon">📊</span>
+                        {{ texts.data }}
+                    </h3>
+                </div>
+
+                <!-- 文件上传按钮 -->
+                <div class="upload-area">
+                    <button class="btn btn-upload" onclick="document.getElementById('fileInput').click()">
+                        <span>📁</span> {{ texts.upload_file }}
+                    </button>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display: none;" onchange="uploadFile(this)">
+                    <p class="upload-hint">{{ texts.support_formats }}</p>
+                </div>
+
+                <!-- 文件选择下拉框 -->
+                <div class="file-selector">
+                    <h4 class="file-selector-title">{{ texts.select_data_source }}</h4>
+                    <div class="file-selector-wrapper">
+                        {% if data_files %}
+                            <select id="fileSelector" class="file-select" onchange="handleFileSelect(this.value)">
+                                <option value="">{{ texts.please_select_file }}</option>
+                                {% for file in data_files %}
+                                <option value="{{ file.id }}" {% if loop.first %}selected{% endif %}>
+                                    {{ file.original_filename }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="file-actions">
+                                <button class="btn-preview" onclick="previewSelectedFile()" title="预览数据">
+                                    👁️ 预览
+                                </button>
+                                <button class="btn-delete-file" onclick="deleteSelectedFile()" title="删除文件">
+                                    🗑️ 删除
+                                </button>
+                            </div>
+                        {% else %}
+                            <p class="no-data">暂无数据文件</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 维度和度量区域 -->
+            <div class="sidebar-section" id="columnsSection" style="display: none;">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <span class="icon">📐</span>
+                        字段
+                    </h3>
+                </div>
+
+                <!-- 当前选中的文件名 -->
+                <div class="selected-file-info">
+                    <p class="selected-file-name" id="selectedFileName"></p>
+                </div>
+
+                <!-- 维度列表 -->
+                <div class="column-group">
+                    <h4 class="column-group-title">
+                        <span class="collapse-icon" onclick="toggleGroup('dimensions')">▼</span>
+                        维度
+                    </h4>
+                    <div class="column-list" id="dimensionsList">
+                        <!-- 通过 JavaScript 动态填充 -->
+                    </div>
+                </div>
+
+                <!-- 度量列表 -->
+                <div class="column-group">
+                    <h4 class="column-group-title">
+                        <span class="collapse-icon" onclick="toggleGroup('measures')">▼</span>
+                        度量
+                    </h4>
+                    <div class="column-list" id="measuresList">
+                        <!-- 通过 JavaScript 动态填充 -->
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区域 -->
+        <main class="dashboard-main">
+            <!-- 图表创建区 -->
+            <div class="chart-create-zone" id="chartCreateZone" 
+                 ondrop="dropFileToCreate(event)" 
+                 ondragover="allowDropFile(event)"
+                 ondragleave="leaveDropFile(event)">
+                <div class="create-zone-content">
+                    <div class="create-zone-icon">🎨</div>
+                    <h3 id="chartCreateTitle">{{ texts.chart_creation_zone }}</h3>
+                    <p id="chartCreateHint">{{ texts.drag_file_to_create }}</p>
+                </div>
+            </div>
+
+            <!-- 可视化类型选择和主题选择 -->
+            <div class="visualization-type-selector" id="tableTypeSelector" style="display: none;">
+                <div class="selector-group">
+                    <label class="vis-type-label" id="visTypeLabel">{{ texts.visualization_type }}：</label>
+                    <select id="visualizationTypeSelect" class="vis-type-select" onchange="handleVisualizationTypeChange(this.value)">
+                        <option value="list">📋 {{ texts.list_table }}</option>
+                        <option value="cross">📊 {{ texts.cross_table }}</option>
+                        <option value="line">📈 {{ texts.line_chart }}</option>
+                        <option value="area">📊 {{ texts.area_chart }}</option>
+                        <option value="pie">🥧 {{ texts.pie_chart }}</option>
+                        <option value="bar">📊 {{ texts.bar_chart }}</option>
+                        <option value="waterfall">📈 {{ texts.waterfall_chart }}</option>
+                        <option value="scatter">🔵 {{ texts.scatter_chart }}</option>
+                        <option value="combo_single">📊 {{ texts.combo_single }}</option>
+                        <option value="combo_dual">📊 {{ texts.combo_dual }}</option>
+                        <option value="wordcloud">☁️ {{ texts.wordcloud }}</option>
+                        <option value="sunburst">☀️ {{ texts.sunburst }}</option>
+                        <option value="map">🗺️ {{ texts.map }}</option>
+                    </select>
+                </div>
+                
+                <div class="selector-group">
+                    <label class="vis-type-label" id="themeLabel">{{ texts.theme }}：</label>
+                    <select id="themeSelect" class="theme-select" onchange="handleThemeChange(this.value)">
+                        <option value="purple">🟣 {{ texts.purple }}</option>
+                        <option value="blue">🔵 {{ texts.blue }}</option>
+                        <option value="green">🟢 {{ texts.green }}</option>
+                        <option value="red">🔴 {{ texts.red }}</option>
+                        <option value="orange">🟠 {{ texts.orange }}</option>
+                        <option value="pink">🌸 {{ texts.pink }}</option>
+                        <option value="teal">🔷 {{ texts.cyan }}</option>
+                        <option value="sunset">🌅 {{ texts.sunset }}</option>
+                        <option value="ocean">🌊 {{ texts.ocean }}</option>
+                        <option value="forest">🌲 {{ texts.forest }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 拖拽配置区域（表格） -->
+            <div class="drag-config-area" id="dragConfigAreaTable" style="display: none;">
+                <!-- 行区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" data-text-key="rows">{{ texts.rows }}</label>
+                    <div class="drop-zone" id="rowsDropZone" ondrop="drop(event, 'rows')" ondragover="allowDrop(event)">
+                        <span class="drop-hint" data-text-key="drag_field_here">{{ texts.drag_field_here }}</span>
+                    </div>
+                </div>
+
+                <!-- 列区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" data-text-key="columns">{{ texts.columns }}</label>
+                    <div class="drop-zone" id="columnsDropZone" ondrop="drop(event, 'columns')" ondragover="allowDrop(event)">
+                        <span class="drop-hint" data-text-key="drag_field_here">{{ texts.drag_field_here }}</span>
+                    </div>
+                </div>
+
+                <!-- 值区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" data-text-key="values">{{ texts.values }}</label>
+                    <div class="drop-zone" id="valuesDropZone" ondrop="drop(event, 'values')" ondragover="allowDrop(event)">
+                        <span class="drop-hint" data-text-key="drag_field_here">{{ texts.drag_field_here }}</span>
+                    </div>
+                </div>
+
+                <!-- 生成表格按钮 -->
+                <div class="generate-btn-container">
+                    <button class="btn btn-generate" id="generateBtn" onclick="generateTable()">
+                        🚀 {{ texts.generate_table }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 拖拽配置区域（联合图） -->
+            <div class="drag-config-area drag-config-combo" id="dragConfigAreaCombo" style="display: none;">
+                <!-- 维度区域 -->
+                <div class="drop-zone-container" style="grid-column: 1 / -1;">
+                    <label class="drop-zone-label">维度（X轴）</label>
+                    <div class="drop-zone" id="comboDimensionDropZone" ondrop="drop(event, 'combo_dimension')" ondragover="allowDrop(event)">
+                        <span class="drop-hint">将维度字段拖到此处</span>
+                    </div>
+                </div>
+
+                <!-- 度量区域 -->
+                <div class="drop-zone-container combo-measures-container" style="grid-column: 1 / -1;">
+                    <label class="drop-zone-label">度量（Y轴）- 可拖拽多个</label>
+                    <div class="drop-zone drop-zone-multi" id="comboMeasuresDropZone" ondrop="drop(event, 'combo_measures')" ondragover="allowDrop(event)">
+                        <span class="drop-hint">将度量字段拖到此处（支持多个）</span>
+                    </div>
+                </div>
+
+                <!-- 生成图表按钮 -->
+                <div class="generate-btn-container" style="grid-column: 1 / -1;">
+                    <button class="btn btn-generate" onclick="generateComboChart()">
+                        🎨 生成联合图
+                    </button>
+                </div>
+            </div>
+
+            <!-- 拖拽配置区域（词云图） -->
+            <div class="drag-config-area drag-config-wordcloud" id="dragConfigAreaWordcloud" style="display: none;">
+                <!-- 文本字段区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" data-text-key="text_field">{{ texts.text_field }}</label>
+                    <div class="drop-zone" id="wordcloudTextDropZone" ondrop="drop(event, 'wordcloud_text')" ondragover="allowDrop(event)">
+                        <span class="drop-hint" data-text-key="drag_text_field_required">{{ texts.drag_text_field_required }}</span>
+                    </div>
+                </div>
+
+                <!-- 权重字段区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" data-text-key="weight_field_optional">{{ texts.weight_field_optional }}</label>
+                    <div class="drop-zone" id="wordcloudWeightDropZone" ondrop="drop(event, 'wordcloud_weight')" ondragover="allowDrop(event)">
+                        <span class="drop-hint" data-text-key="drag_weight_field_optional">{{ texts.drag_weight_field_optional }}</span>
+                    </div>
+                </div>
+
+                <!-- 形状选择区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" data-text-key="wordcloud_shape" id="wordcloudShapeLabel">{{ texts.wordcloud_shape }}</label>
+                    <select id="wordcloudShapeSelect" class="config-select">
+                        <option value="rectangle">📐 {{ texts.shape_rectangle }}</option>
+                        <option value="circle">⭕ {{ texts.shape_circle }}</option>
+                        <option value="cloud">☁️ {{ texts.shape_cloud }}</option>
+                        <option value="star">⭐ {{ texts.shape_star }}</option>
+                        <option value="heart">❤️ {{ texts.shape_heart }}</option>
+                        <option value="diamond">💎 {{ texts.shape_diamond }}</option>
+                    </select>
+                </div>
+
+                <!-- 生成图表按钮 -->
+                <div class="generate-btn-container" style="grid-column: 1 / -1;">
+                    <button class="btn btn-generate" id="generateWordcloudBtn" onclick="generateWordcloud()">
+                        🎨 <span id="generateWordcloudText">{{ texts.generate_wordcloud }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 拖拽配置区域（图表） -->
+            <div class="drag-config-area drag-config-chart" id="dragConfigAreaChart" style="display: none;">
+                <!-- X轴区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" id="xAxisLabel">X轴（维度）</label>
+                    <div class="drop-zone" id="xAxisDropZone" ondrop="drop(event, 'x_axis')" ondragover="allowDrop(event)">
+                        <span class="drop-hint" id="xAxisHint">将维度字段拖到此处</span>
+                    </div>
+                </div>
+
+                <!-- Y轴区域 -->
+                <div class="drop-zone-container">
+                    <label class="drop-zone-label" id="yAxisLabel">Y轴（度量）</label>
+                    <div class="drop-zone" id="yAxisDropZone" ondrop="drop(event, 'y_axis')" ondragover="allowDrop(event)">
+                        <span class="drop-hint" id="yAxisHint">将度量字段拖到此处</span>
+                    </div>
+                </div>
+                
+                <!-- 分组字段区域（仅散点图显示） -->
+                <div class="drop-zone-container" id="groupFieldContainer" style="display: none; grid-column: 1 / -1;">
+                    <label class="drop-zone-label">大小字段（可选）</label>
+                    <div class="drop-zone" id="groupFieldDropZone" ondrop="drop(event, 'group_field')" ondragover="allowDrop(event)">
+                        <span class="drop-hint">将度量字段拖到此处，用点的大小表示数值</span>
+                    </div>
+                </div>
+
+                <!-- 文字工具按钮 -->
+                <div class="text-tool-container" style="grid-column: 1 / -1;">
+                    <button class="btn-text-tool" onclick="toggleTextOptions()" title="添加文字标签">
+                        <span class="text-tool-icon">T</span> 文字标签
+                    </button>
+                </div>
+
+                <!-- 文字配置选项（折叠） -->
+                <div class="text-options-panel" id="textOptionsPanel" style="display: none; grid-column: 1 / -1;">
+                    <div class="text-option-item">
+                        <label class="text-option-label">
+                            <input type="checkbox" id="enableTitle" onchange="toggleTextInput('title')"> 标题
+                        </label>
+                        <input type="text" id="titleInput" class="text-input" placeholder="输入标题内容" disabled>
+                    </div>
+                    <div class="text-option-item">
+                        <label class="text-option-label">
+                            <input type="checkbox" id="enableXLabel" onchange="toggleTextInput('xlabel')"> 横轴标签
+                        </label>
+                        <input type="text" id="xlabelInput" class="text-input" placeholder="输入横轴标签" disabled>
+                    </div>
+                    <div class="text-option-item">
+                        <label class="text-option-label">
+                            <input type="checkbox" id="enableYLabel" onchange="toggleTextInput('ylabel')"> 纵轴标签
+                        </label>
+                        <input type="text" id="ylabelInput" class="text-input" placeholder="输入纵轴标签" disabled>
+                    </div>
+                </div>
+
+                <!-- 生成图表按钮 -->
+                <div class="generate-btn-container" style="grid-column: 1 / -1;">
+                    <button class="btn btn-generate" onclick="generateChart()">
+                        🎨 生成图表
+                    </button>
+                </div>
+            </div>
+
+            <!-- 表格显示区域 -->
+            <div class="table-display-area" id="tableDisplayArea">
+                <div class="placeholder">
+                    <div class="placeholder-icon">📊</div>
+                    <p id="tableDisplayPlaceholder">{{ texts.select_file_drag_field_to_create }}</p>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- 数据预览弹窗 -->
+<div class="modal-overlay" id="previewModal" style="display: none;" onclick="closePreviewModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2 id="modalFileName">数据预览</h2>
+            <button class="modal-close-btn" onclick="closePreviewModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-info">
+                <span id="modalFileInfo">加载中...</span>
+            </div>
+            <div class="modal-table-wrapper" id="modalTableWrapper">
+                <!-- 表格内容将通过JavaScript填充 -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 度量配置弹窗（联合图） -->
+<div class="modal-overlay" id="measureConfigModal" style="display: none;" onclick="closeMeasureConfig(event)">
+    <div class="modal-content axis-config-modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2 id="measureConfigTitle">度量配置</h2>
+            <button class="modal-close-btn" onclick="closeMeasureConfig()">&times;</button>
+        </div>
+        <div class="modal-body axis-config-body">
+            <!-- 图表类型 -->
+            <div class="config-section">
+                <label class="config-label">图表类型</label>
+                <select id="measureChartType" class="config-select">
+                    <option value="bar">📊 柱状图</option>
+                    <option value="line">📈 折线图</option>
+                    <option value="area">📊 面积图</option>
+                </select>
+            </div>
+
+            <!-- 聚合方式 -->
+            <div class="config-section">
+                <label class="config-label">聚合方式</label>
+                <select id="measureAggregation" class="config-select">
+                    <option value="sum">求和</option>
+                    <option value="avg">平均值</option>
+                    <option value="count">计数</option>
+                    <option value="max">最大值</option>
+                    <option value="min">最小值</option>
+                </select>
+            </div>
+
+            <!-- 按钮 -->
+            <div class="config-buttons">
+                <button class="btn btn-secondary" onclick="closeMeasureConfig()">取消</button>
+                <button class="btn btn-primary" onclick="saveMeasureConfig()">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 轴配置弹窗 -->
+<div class="modal-overlay" id="axisConfigModal" style="display: none;" onclick="closeAxisConfig(event)">
+    <div class="modal-content axis-config-modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2 id="axisConfigTitle">轴设置</h2>
+            <button class="modal-close-btn" onclick="closeAxisConfig()">&times;</button>
+        </div>
+        <div class="modal-body axis-config-body">
+            <!-- 聚合方式 -->
+            <div class="config-section">
+                <label class="config-label">度量</label>
+                <select id="axisAggregation" class="config-select">
+                    <option value="sum">求和</option>
+                    <option value="avg">平均值</option>
+                    <option value="count">计数</option>
+                    <option value="max">最大值</option>
+                    <option value="min">最小值</option>
+                </select>
+            </div>
+
+            <!-- 排序方式 -->
+            <div class="config-section">
+                <label class="config-label">排序方式</label>
+                <select id="axisSort" class="config-select">
+                    <option value="none">无</option>
+                    <option value="asc">升序</option>
+                    <option value="desc">降序</option>
+                </select>
+            </div>
+
+            <!-- 数据格式 -->
+            <div class="config-section">
+                <label class="config-label">数据格式</label>
+                <select id="axisFormat" class="config-select">
+                    <option value="number">数字</option>
+                    <option value="percent">百分比</option>
+                    <option value="currency">货币（￥）</option>
+                </select>
+            </div>
+
+            <!-- 轴名称 -->
+            <div class="config-section">
+                <label class="config-label">轴名称（可选）</label>
+                <input type="text" id="axisName" class="config-input" placeholder="留空则使用字段名">
+            </div>
+
+            <!-- 对数轴 -->
+            <div class="config-section">
+                <label class="config-label">对数轴</label>
+                <div class="config-radio-group">
+                    <label class="config-radio">
+                        <input type="radio" name="logScale" value="false" checked> 关
+                    </label>
+                    <label class="config-radio">
+                        <input type="radio" name="logScale" value="true"> 开
+                    </label>
+                </div>
+            </div>
+
+            <!-- 按钮 -->
+            <div class="config-buttons">
+                <button class="btn btn-secondary" onclick="closeAxisConfig()">取消</button>
+                <button class="btn btn-primary" onclick="saveAxisConfig()">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 当前语言
+var currentLanguage = '{{ lang }}';
+var allTexts = {{ texts | tojson }};
+
+// 切换语言（无刷新）
+function switchLanguage(lang) {
+    if (lang === currentLanguage) return;
+    
+    fetch('/api/set_language/' + lang, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentLanguage = lang;
+            allTexts = data.texts;
+            updatePageTexts();
+            updateLanguageButtons();
+        }
+    })
+    .catch(error => {
+        console.error('语言切换失败:', error);
+    });
+}
+
+// 更新语言按钮状态
+function updateLanguageButtons() {
+    document.getElementById('lang-btn-zh').classList.toggle('active', currentLanguage === 'zh');
+    document.getElementById('lang-btn-en').classList.toggle('active', currentLanguage === 'en');
+}
+
+// 更新页面文本
+function updatePageTexts() {
+    // 更新header标题
+    document.querySelector('.header-title').textContent = allTexts.app_title;
+    
+    // 更新按钮文本
+    const dashboardBtn = document.querySelector('.btn-dashboard-mode');
+    if (dashboardBtn) {
+        dashboardBtn.innerHTML = '📊 ' + allTexts.dashboard_mode;
+        dashboardBtn.title = allTexts.switch_to_dashboard;
+    }
+    
+    // 更新欢迎文本
+    const welcomeText = document.querySelector('.welcome-text');
+    if (welcomeText) {
+        const username = welcomeText.textContent.split('，')[1] || welcomeText.textContent.split(', ')[1];
+        welcomeText.textContent = allTexts.welcome + (currentLanguage === 'zh' ? '，' : ', ') + username;
+    }
+    
+    // 更新注销按钮
+    document.querySelector('.btn-logout').textContent = allTexts.logout;
+    
+    // 更新左侧边栏标题
+    document.querySelectorAll('.section-title').forEach((el, index) => {
+        if (index === 0) el.innerHTML = '<span class="icon">📊</span>' + allTexts.data;
+        if (index === 1) el.innerHTML = '<span class="icon">📐</span>' + allTexts.fields;
+    });
+    
+    // 更新上传按钮
+    const uploadBtn = document.querySelector('.btn-upload');
+    if (uploadBtn) {
+        uploadBtn.innerHTML = '<span>📁</span> ' + allTexts.upload_file;
+    }
+    
+    // 更新提示文本
+    const uploadHint = document.querySelector('.upload-hint');
+    if (uploadHint) {
+        uploadHint.textContent = allTexts.support_formats;
+    }
+    
+    // 更新文件选择标题
+    const fileSelectorTitle = document.querySelector('.file-selector-title');
+    if (fileSelectorTitle) {
+        fileSelectorTitle.textContent = allTexts.select_data_source;
+    }
+    
+    // 更新下拉框默认选项
+    const fileSelector = document.getElementById('fileSelector');
+    if (fileSelector && fileSelector.options[0]) {
+        fileSelector.options[0].text = allTexts.please_select_file;
+    }
+    
+    // 更新维度/度量标题
+    const columnGroupTitles = document.querySelectorAll('.column-group-title');
+    columnGroupTitles.forEach((el) => {
+        const text = el.textContent.trim();
+        if (text.includes('维度') || text.includes('Dimensions')) {
+            el.innerHTML = '<span class="collapse-icon" onclick="toggleGroup(\'dimensions\')">▼</span>' + allTexts.dimensions;
+        } else if (text.includes('度量') || text.includes('Measures')) {
+            el.innerHTML = '<span class="collapse-icon" onclick="toggleGroup(\'measures\')">▼</span>' + allTexts.measures;
+        }
+    });
+    
+    // 更新预览和删除按钮
+    const previewBtn = document.querySelector('.btn-preview');
+    if (previewBtn) {
+        previewBtn.innerHTML = '👁️ ' + allTexts.preview;
+    }
+    
+    const deleteFileBtn = document.querySelector('.btn-delete-file');
+    if (deleteFileBtn) {
+        deleteFileBtn.innerHTML = '🗑️ ' + allTexts.delete;
+    }
+    
+    // 更新生成按钮
+    const generateBtn = document.getElementById('generateBtn');
+    if (generateBtn) {
+        const isTable = currentVisualizationType === 'list' || currentVisualizationType === 'cross';
+        generateBtn.innerHTML = '🚀 ' + (isTable ? allTexts.generate_table : allTexts.generate_chart);
+    }
+    
+    // 更新可视化类型标签
+    const visTypeLabel = document.getElementById('visTypeLabel');
+    if (visTypeLabel) {
+        visTypeLabel.textContent = allTexts.visualization_type + '：';
+    }
+    
+    // 更新主题标签
+    const themeLabel = document.getElementById('themeLabel');
+    if (themeLabel) {
+        themeLabel.textContent = allTexts.theme + '：';
+    }
+    
+    // 更新可视化类型下拉选项
+    const visTypeSelect = document.getElementById('visualizationTypeSelect');
+    if (visTypeSelect) {
+        visTypeSelect.options[0].text = '📋 ' + allTexts.list_table;
+        visTypeSelect.options[1].text = '📊 ' + allTexts.cross_table;
+        visTypeSelect.options[2].text = '📈 ' + allTexts.line_chart;
+        visTypeSelect.options[3].text = '📊 ' + allTexts.area_chart;
+        visTypeSelect.options[4].text = '🥧 ' + allTexts.pie_chart;
+        visTypeSelect.options[5].text = '📊 ' + allTexts.bar_chart;
+        visTypeSelect.options[6].text = '📈 ' + allTexts.waterfall_chart;
+        visTypeSelect.options[7].text = '🔵 ' + allTexts.scatter_chart;
+        visTypeSelect.options[8].text = '📊 ' + allTexts.combo_single;
+        visTypeSelect.options[9].text = '📊 ' + allTexts.combo_dual;
+        visTypeSelect.options[10].text = '☁️ ' + allTexts.wordcloud;
+        visTypeSelect.options[11].text = '☀️ ' + allTexts.sunburst;
+        visTypeSelect.options[12].text = '🗺️ ' + allTexts.map;
+    }
+    
+    // 更新主题下拉选项
+    const themeSelect = document.getElementById('themeSelect');
+    if (themeSelect) {
+        themeSelect.options[0].text = '🟣 ' + allTexts.purple;
+        themeSelect.options[1].text = '🔵 ' + allTexts.blue;
+        themeSelect.options[2].text = '🟢 ' + allTexts.green;
+        themeSelect.options[3].text = '🔴 ' + allTexts.red;
+        themeSelect.options[4].text = '🟠 ' + allTexts.orange;
+        themeSelect.options[5].text = '🌸 ' + allTexts.pink;
+        themeSelect.options[6].text = '🔷 ' + allTexts.cyan;
+        themeSelect.options[7].text = '🌅 ' + allTexts.sunset;
+        themeSelect.options[8].text = '🌊 ' + allTexts.ocean;
+        themeSelect.options[9].text = '🌲 ' + allTexts.forest;
+    }
+    
+    // 更新所有带data-text-key属性的元素
+    document.querySelectorAll('[data-text-key]').forEach(el => {
+        const key = el.getAttribute('data-text-key');
+        if (allTexts[key]) {
+            el.textContent = allTexts[key];
+        }
+    });
+    
+    // 更新图表创建区文本
+    const chartCreateTitle = document.getElementById('chartCreateTitle');
+    if (chartCreateTitle) chartCreateTitle.textContent = allTexts.chart_creation_zone;
+    
+    const chartCreateHint = document.getElementById('chartCreateHint');
+    if (chartCreateHint) chartCreateHint.textContent = allTexts.drag_file_to_create;
+    
+    // 更新词云图配置区域
+    const wordcloudShapeSelect = document.getElementById('wordcloudShapeSelect');
+    if (wordcloudShapeSelect && wordcloudShapeSelect.options.length >= 6) {
+        wordcloudShapeSelect.options[0].text = '📐 ' + allTexts.shape_rectangle;
+        wordcloudShapeSelect.options[1].text = '⭕ ' + allTexts.shape_circle;
+        wordcloudShapeSelect.options[2].text = '☁️ ' + allTexts.shape_cloud;
+        wordcloudShapeSelect.options[3].text = '⭐ ' + allTexts.shape_star;
+        wordcloudShapeSelect.options[4].text = '❤️ ' + allTexts.shape_heart;
+        wordcloudShapeSelect.options[5].text = '💎 ' + allTexts.shape_diamond;
+    }
+    
+    const generateWordcloudText = document.getElementById('generateWordcloudText');
+    if (generateWordcloudText) generateWordcloudText.textContent = allTexts.generate_wordcloud;
+    
+    // 更新表格显示区域占位符
+    const tableDisplayPlaceholder = document.getElementById('tableDisplayPlaceholder');
+    if (tableDisplayPlaceholder) tableDisplayPlaceholder.textContent = allTexts.select_file_drag_field_to_create;
+}
+
+// 当前选中的文件ID和可视化类型
+let selectedFileId = null;
+let currentVisualizationType = 'list';  // 'list', 'cross', 'bar', 'waterfall'
+let currentChartFilename = null;  // 当前图表文件名
+let currentTheme = 'purple'; // 默认主题
+
+// 主题颜色配置
+const themeColors = {
+    purple: {
+        name: '紫色系',
+        primary: '#667eea',
+        secondary: '#764ba2',
+        gradient: ['#667eea', '#764ba2'],
+        multi: ['#9b87f5', '#7c6fd6', '#667eea', '#5757d8', '#4641c6']
+    },
+    blue: {
+        name: '蓝色系',
+        primary: '#4299e1',
+        secondary: '#2b6cb0',
+        gradient: ['#4299e1', '#2b6cb0'],
+        multi: ['#90cdf4', '#63b3ed', '#4299e1', '#3182ce', '#2c5282']
+    },
+    green: {
+        name: '绿色系',
+        primary: '#48bb78',
+        secondary: '#2f855a',
+        gradient: ['#48bb78', '#2f855a'],
+        multi: ['#9ae6b4', '#68d391', '#48bb78', '#38a169', '#2f855a']
+    },
+    red: {
+        name: '红色系',
+        primary: '#f56565',
+        secondary: '#c53030',
+        gradient: ['#f56565', '#c53030'],
+        multi: ['#fc8181', '#f56565', '#e53e3e', '#c53030', '#9b2c2c']
+    },
+    orange: {
+        name: '橙色系',
+        primary: '#ed8936',
+        secondary: '#c05621',
+        gradient: ['#ed8936', '#c05621'],
+        multi: ['#fbd38d', '#f6ad55', '#ed8936', '#dd6b20', '#c05621']
+    },
+    pink: {
+        name: '粉色系',
+        primary: '#ed64a6',
+        secondary: '#b83280',
+        gradient: ['#ed64a6', '#b83280'],
+        multi: ['#fbb6ce', '#f687b3', '#ed64a6', '#d53f8c', '#b83280']
+    },
+    teal: {
+        name: '青色系',
+        primary: '#38b2ac',
+        secondary: '#2c7a7b',
+        gradient: ['#38b2ac', '#2c7a7b'],
+        multi: ['#81e6d9', '#4fd1c5', '#38b2ac', '#319795', '#2c7a7b']
+    },
+    sunset: {
+        name: '日落渐变',
+        primary: '#f093fb',
+        secondary: '#f5576c',
+        gradient: ['#f093fb', '#f5576c'],
+        multi: ['#fbc2eb', '#f093fb', '#f57b94', '#f5576c', '#d63447']
+    },
+    ocean: {
+        name: '海洋渐变',
+        primary: '#667eea',
+        secondary: '#00c9ff',
+        gradient: ['#667eea', '#00c9ff'],
+        multi: ['#8b9aed', '#667eea', '#4395e6', '#00b9e3', '#00c9ff']
+    },
+    forest: {
+        name: '森林渐变',
+        primary: '#56ab2f',
+        secondary: '#a8e063',
+        gradient: ['#56ab2f', '#a8e063'],
+        multi: ['#6bc248', '#56ab2f', '#75b94d', '#92c96e', '#a8e063']
+    }
+};
+
+// 拖拽配置（表格）
+let dragConfig = {
+    rows: [],
+    columns: [],
+    values: []
+};
+
+// 拖拽配置（图表）
+let chartConfig = {
+    x_axis: null,
+    y_axis: null,
+    group_field: null,  // 散点图分组字段
+    // 轴配置
+    x_axis_config: {
+        aggregation: 'sum',  // 聚合方式：sum, avg, count, max, min
+        sort: 'none',        // 排序：none, asc, desc
+        format: 'number',    // 格式：number, percent, currency
+        log_scale: false,    // 对数轴
+        axis_name: ''        // 自定义轴名称
+    },
+    y_axis_config: {
+        aggregation: 'sum',
+        sort: 'none',
+        format: 'number',
+        log_scale: false,
+        axis_name: ''
+    }
+};
+
+// 拖拽配置（联合图）
+let comboConfig = {
+    dimension: null,  // 维度字段（X轴）
+    measures: []      // 度量字段数组，每个度量包含字段名和图表类型
+};
+
+// 词云图配置
+let wordcloudConfig = {
+    text_field: null,   // 文本字段
+    weight_field: null  // 权重字段（可选）
+};
+
+// 上传文件
+function uploadFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    showLoading('正在上传文件...');
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('上传失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('上传失败: ' + error.message);
+    });
+
+    input.value = '';
+}
+
+// 文件拖拽开始
+let draggedFileId = null;
+
+function dragFileStart(event, fileId) {
+    draggedFileId = fileId;
+    event.dataTransfer.effectAllowed = 'move';
+    event.currentTarget.classList.add('dragging-file');
+}
+
+function dragFileEnd(event) {
+    event.currentTarget.classList.remove('dragging-file');
+}
+
+// 允许放置文件到创建区
+function allowDropFile(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over-create');
+}
+
+function leaveDropFile(event) {
+    event.currentTarget.classList.remove('drag-over-create');
+}
+
+// 放置文件到创建区
+function dropFileToCreate(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over-create');
+    
+    if (draggedFileId) {
+        // 直接切换文件，不再询问确认
+        selectFile(draggedFileId);
+        draggedFileId = null;
+    }
+}
+
+// 处理文件选择下拉框变化
+function handleFileSelect(fileId) {
+    if (!fileId) return; // 如果选择的是默认选项，不做处理
+    
+    const fileIdInt = parseInt(fileId);
+    
+    // 直接切换文件，不再询问确认
+    selectFile(fileIdInt);
+}
+
+// 预览选中的文件
+function previewSelectedFile() {
+    const selector = document.getElementById('fileSelector');
+    const fileId = selector.value;
+    
+    if (!fileId) {
+        alert(allTexts.please_select_file_first);
+        return;
+    }
+    
+    showFilePreview(parseInt(fileId));
+}
+
+// 删除选中的文件
+function deleteSelectedFile() {
+    const selector = document.getElementById('fileSelector');
+    const fileId = selector.value;
+    
+    if (!fileId) {
+        alert(allTexts.please_select_file_first);
+        return;
+    }
+    
+    deleteFile(parseInt(fileId));
+}
+
+// 处理文件点击事件（旧版，保留兼容）
+let clickTimer = null;
+function handleFileClick(event, fileId) {
+    // 阻止拖动时触发点击
+    if (event.detail === 0) return;
+    
+    // 如果双击，清除单击计时器
+    clearTimeout(clickTimer);
+    
+    // 设置单击延迟（避免双击时触发单击）
+    clickTimer = setTimeout(() => {
+        if (selectedFileId && selectedFileId !== fileId) {
+            // 直接切换文件，不再询问确认
+            selectFile(fileId);
+        } else if (!selectedFileId) {
+            // 首次点击，显示预览
+            showFilePreview(fileId);
+        }
+    }, 250); // 250ms延迟，如果是双击则会被清除
+}
+
+// 选择文件（开始创建图表）
+function selectFile(fileId) {
+    selectedFileId = fileId;
+
+    // 隐藏创建区
+    document.getElementById('chartCreateZone').style.display = 'none';
+    
+    // 更新下拉框选中状态
+    const selector = document.getElementById('fileSelector');
+    if (selector) {
+        selector.value = fileId;
+    }
+    
+    // 高亮选中的文件（如果使用旧版列表）
+    document.querySelectorAll('.file-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+    if (fileItem) {
+        fileItem.classList.add('selected');
+    }
+
+    loadFileColumns(fileId);
+    
+    // 显示可视化类型选择器
+    document.getElementById('tableTypeSelector').style.display = 'flex';
+    
+    // 确保下拉框有默认值（清单表）
+    const visSelect = document.getElementById('visualizationTypeSelect');
+    if (visSelect && !currentVisualizationType) {
+        currentVisualizationType = 'list';
+        visSelect.value = 'list';
+    } else if (visSelect) {
+        visSelect.value = currentVisualizationType;
+    }
+    
+    // 根据当前类型显示对应的配置区域
+    updateConfigArea();
+    
+    // 清空之前的配置
+    resetAllConfig();
+}
+
+// 显示文件预览弹窗
+function showFilePreview(fileId) {
+    showLoading('正在加载数据...');
+    
+    fetch(`/api/file/${fileId}/preview`)
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            displayPreviewModal(data);
+        } else {
+            alert('加载失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('加载失败: ' + error.message);
+    });
+}
+
+// 显示预览弹窗内容
+function displayPreviewModal(data) {
+    document.getElementById('modalFileName').textContent = data.filename;
+    document.getElementById('modalFileInfo').textContent = 
+        `共 ${data.total_rows} 行 × ${data.total_columns} 列，显示前 ${data.displayed_rows} 行`;
+    
+    let html = '<table class="preview-table">';
+    
+    // 表头
+    html += '<thead><tr>';
+    data.columns.forEach(col => {
+        html += `<th>${col}</th>`;
+    });
+    html += '</tr></thead>';
+    
+    // 表体
+    html += '<tbody>';
+    data.data.forEach(row => {
+        html += '<tr>';
+        row.forEach(cell => {
+            const displayValue = typeof cell === 'number' ? cell.toLocaleString() : cell;
+            html += `<td>${displayValue}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody>';
+    
+    html += '</table>';
+    
+    document.getElementById('modalTableWrapper').innerHTML = html;
+    document.getElementById('previewModal').style.display = 'flex';
+}
+
+// 关闭预览弹窗
+function closePreviewModal(event) {
+    if (!event || event.target.id === 'previewModal' || event.target.className === 'modal-close-btn') {
+        document.getElementById('previewModal').style.display = 'none';
+    }
+}
+
+// 加载文件列信息
+function loadFileColumns(fileId) {
+    showLoading('正在加载数据...');
+
+    fetch(`/api/file/${fileId}/columns`)
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            document.getElementById('columnsSection').style.display = 'block';
+            document.getElementById('selectedFileName').textContent = data.filename;
+
+            const dimensionsList = document.getElementById('dimensionsList');
+            dimensionsList.innerHTML = '';
+            data.dimensions.forEach(dim => {
+                const item = createColumnItem(dim, 'dimension');
+                dimensionsList.appendChild(item);
+            });
+
+            const measuresList = document.getElementById('measuresList');
+            measuresList.innerHTML = '';
+            data.measures.forEach(measure => {
+                const item = createColumnItem(measure, 'measure');
+                measuresList.appendChild(item);
+            });
+
+            if (data.dimensions.length === 0) {
+                dimensionsList.innerHTML = '<p class="no-data">暂无维度字段</p>';
+            }
+            if (data.measures.length === 0) {
+                measuresList.innerHTML = '<p class="no-data">暂无度量字段</p>';
+            }
+        } else {
+            alert('加载失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('加载失败: ' + error.message);
+    });
+}
+
+// 创建列项元素（可拖拽）
+function createColumnItem(columnName, type) {
+    const item = document.createElement('div');
+    item.className = 'column-item';
+    item.draggable = true;
+    item.dataset.columnName = columnName;
+    item.dataset.columnType = type;
+
+    const icon = type === 'dimension' ? '📏' : '🔢';
+    item.innerHTML = `
+        <span class="column-icon">${icon}</span>
+        <span class="column-name" title="${columnName}">${columnName}</span>
+    `;
+
+    // 拖拽开始事件
+    item.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('columnName', columnName);
+        e.dataTransfer.setData('columnType', type);
+        item.classList.add('dragging');
+    });
+
+    // 拖拽结束事件
+    item.addEventListener('dragend', function(e) {
+        item.classList.remove('dragging');
+    });
+
+    return item;
+}
+
+// 允许放置
+function allowDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+
+// 拖拽放置
+function drop(e, zone) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const columnName = e.dataTransfer.getData('columnName');
+    const columnType = e.dataTransfer.getData('columnType');
+    
+    if (!columnName) return;
+    
+    // 词云图配置
+    if (zone === 'wordcloud_text') {
+        wordcloudConfig.text_field = columnName;
+        updateWordcloudDropZone('text');
+        return;
+    }
+    
+    if (zone === 'wordcloud_weight') {
+        wordcloudConfig.weight_field = columnName;
+        updateWordcloudDropZone('weight');
+        return;
+    }
+    
+    // 联合图配置
+    if (zone === 'combo_dimension') {
+        comboConfig.dimension = columnName;
+        updateComboDropZone('dimension');
+        return;
+    }
+    
+    if (zone === 'combo_measures') {
+        // 度量字段可以添加多个
+        const exists = comboConfig.measures.find(m => m.field === columnName);
+        if (!exists) {
+            comboConfig.measures.push({
+                field: columnName,
+                chart_type: 'bar',  // 默认柱状图
+                aggregation: 'sum'  // 默认求和
+            });
+            updateComboDropZone('measures');
+        }
+        return;
+    }
+    
+    // 图表配置（只允许单个字段）
+    if (zone === 'x_axis' || zone === 'y_axis' || zone === 'group_field') {
+        chartConfig[zone] = columnName;
+        updateChartDropZone(zone);
+        return;
+    }
+    
+    // 表格配置（允许多个字段）
+    if (dragConfig[zone] && dragConfig[zone].includes(columnName)) {
+        return;
+    }
+    
+    dragConfig[zone].push(columnName);
+    updateDropZone(zone);
+}
+
+// 更新放置区域显示
+function updateDropZone(zone) {
+    const dropZone = document.getElementById(zone + 'DropZone');
+    const hint = dropZone.querySelector('.drop-hint');
+    
+    if (dragConfig[zone].length === 0) {
+        hint.style.display = 'block';
+        return;
+    }
+    
+    hint.style.display = 'none';
+    
+    // 移除已有的字段标签
+    dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+    
+    // 添加新的字段标签
+    dragConfig[zone].forEach(fieldName => {
+        const tag = document.createElement('div');
+        tag.className = 'field-tag';
+        tag.innerHTML = `
+            <span>${fieldName}</span>
+            <button class="remove-field" onclick="removeField('${zone}', '${fieldName}')">&times;</button>
+        `;
+        dropZone.appendChild(tag);
+    });
+}
+
+// 移除字段
+function removeField(zone, fieldName) {
+    const index = dragConfig[zone].indexOf(fieldName);
+    if (index > -1) {
+        dragConfig[zone].splice(index, 1);
+        updateDropZone(zone);
+    }
+}
+
+// 重置所有配置
+function resetAllConfig() {
+    // 重置表格配置
+    dragConfig = { rows: [], columns: [], values: [] };
+    if (document.getElementById('rowsDropZone')) {
+        updateDropZone('rows');
+        updateDropZone('columns');
+        updateDropZone('values');
+    }
+    
+    // 重置图表配置
+    chartConfig = {
+        x_axis: null,
+        y_axis: null,
+        group_field: null,
+        x_axis_config: {
+            aggregation: 'sum',
+            sort: 'none',
+            format: 'number',
+            log_scale: false,
+            axis_name: ''
+        },
+        y_axis_config: {
+            aggregation: 'sum',
+            sort: 'none',
+            format: 'number',
+            log_scale: false,
+            axis_name: ''
+        }
+    };
+    if (document.getElementById('xAxisDropZone')) {
+        updateChartDropZone('x_axis');
+        updateChartDropZone('y_axis');
+        updateChartDropZone('group_field');
+    }
+    
+    // 重置联合图配置
+    comboConfig = {
+        dimension: null,
+        measures: []
+    };
+    if (document.getElementById('comboDimensionDropZone')) {
+        updateComboDropZone('dimension');
+        updateComboDropZone('measures');
+    }
+    
+    // 重置词云图配置
+    wordcloudConfig = {
+        text_field: null,
+        weight_field: null
+    };
+    if (document.getElementById('wordcloudTextDropZone')) {
+        updateWordcloudDropZone('text');
+        updateWordcloudDropZone('weight');
+    }
+    
+    // 清空显示区域
+    document.getElementById('tableDisplayArea').innerHTML = `
+        <div class="placeholder">
+            <div class="placeholder-icon">📊</div>
+            <p>选择数据文件并拖拽字段开始创建可视化</p>
+        </div>
+    `;
+}
+
+// 处理可视化类型下拉框变化
+function handleVisualizationTypeChange(type) {
+    currentVisualizationType = type;
+    
+    // 更新配置区域
+    updateConfigArea();
+    
+    // 清空配置
+    resetAllConfig();
+}
+
+// 处理主题变化
+function handleThemeChange(theme) {
+    currentTheme = theme;
+    console.log('主题已切换到:', themeColors[theme].name);
+    // 主题会在生成图表时应用，无需立即更新
+}
+
+// 选择可视化类型（保留以兼容旧代码）
+function selectVisualizationType(type) {
+    currentVisualizationType = type;
+    
+    // 如果有下拉框，更新下拉框的值
+    const select = document.getElementById('visualizationTypeSelect');
+    if (select) {
+        select.value = type;
+    }
+    
+    // 更新按钮状态（如果还有按钮的话）
+    document.querySelectorAll('.btn-table-type').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    const targetBtn = document.querySelector(`[data-type="${type}"]`);
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+    }
+    
+    // 更新配置区域
+    updateConfigArea();
+    
+    // 清空配置
+    resetAllConfig();
+}
+
+// 更新配置区域显示
+function updateConfigArea() {
+    const tableArea = document.getElementById('dragConfigAreaTable');
+    const chartArea = document.getElementById('dragConfigAreaChart');
+    const comboArea = document.getElementById('dragConfigAreaCombo');
+    const wordcloudArea = document.getElementById('dragConfigAreaWordcloud');
+    
+    if (currentVisualizationType === 'list' || currentVisualizationType === 'cross' || currentVisualizationType === 'sunburst') {
+        // 显示表格配置（清单表、交叉表、旭日图）
+        tableArea.style.display = 'grid';
+        chartArea.style.display = 'none';
+        comboArea.style.display = 'none';
+        wordcloudArea.style.display = 'none';
+    } else if (currentVisualizationType === 'combo_single' || currentVisualizationType === 'combo_dual') {
+        // 显示联合图配置
+        tableArea.style.display = 'none';
+        chartArea.style.display = 'none';
+        comboArea.style.display = 'grid';
+        wordcloudArea.style.display = 'none';
+    } else if (currentVisualizationType === 'wordcloud') {
+        // 显示词云图配置
+        tableArea.style.display = 'none';
+        chartArea.style.display = 'none';
+        comboArea.style.display = 'none';
+        wordcloudArea.style.display = 'grid';
+    } else if (currentVisualizationType === 'line' || currentVisualizationType === 'area' || currentVisualizationType === 'pie' || currentVisualizationType === 'bar' || currentVisualizationType === 'waterfall' || currentVisualizationType === 'map' || currentVisualizationType === 'scatter') {
+        // 显示图表配置（折线图、面积图、饼图、柱状图、瀑布图、地图、散点图）
+        tableArea.style.display = 'none';
+        chartArea.style.display = 'grid';
+        comboArea.style.display = 'none';
+        wordcloudArea.style.display = 'none';
+        
+        // 获取标签元素
+        const xAxisLabel = document.getElementById('xAxisLabel');
+        const yAxisLabel = document.getElementById('yAxisLabel');
+        const xAxisHint = document.getElementById('xAxisHint');
+        const yAxisHint = document.getElementById('yAxisHint');
+        const groupFieldContainer = document.getElementById('groupFieldContainer');
+        
+        // 更新标签文字
+        if (currentVisualizationType === 'map') {
+            xAxisLabel.textContent = '地区字段';
+            yAxisLabel.textContent = 'Y轴（度量）';
+            xAxisHint.textContent = '将地区字段拖到此处';
+            yAxisHint.textContent = '将度量字段拖到此处';
+            groupFieldContainer.style.display = 'none';
+        } else if (currentVisualizationType === 'scatter') {
+            xAxisLabel.textContent = 'X轴（度量）';
+            yAxisLabel.textContent = 'Y轴（度量）';
+            xAxisHint.textContent = '将度量字段拖到此处';
+            yAxisHint.textContent = '将度量字段拖到此处';
+            groupFieldContainer.style.display = 'block';
+        } else {
+            xAxisLabel.textContent = 'X轴（维度）';
+            yAxisLabel.textContent = 'Y轴（度量）';
+            xAxisHint.textContent = '将维度字段拖到此处';
+            yAxisHint.textContent = '将度量字段拖到此处';
+            groupFieldContainer.style.display = 'none';
+        }
+    }
+}
+
+// 更新图表放置区域显示
+function updateChartDropZone(zone) {
+    let dropZone;
+    if (zone === 'x_axis') {
+        dropZone = document.getElementById('xAxisDropZone');
+    } else if (zone === 'y_axis') {
+        dropZone = document.getElementById('yAxisDropZone');
+    } else if (zone === 'group_field') {
+        dropZone = document.getElementById('groupFieldDropZone');
+    }
+    
+    if (!dropZone) return;
+    
+    const hint = dropZone.querySelector('.drop-hint');
+    
+    if (!chartConfig[zone]) {
+        hint.style.display = 'block';
+        dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+        return;
+    }
+    
+    hint.style.display = 'none';
+    dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+    
+    const tag = document.createElement('div');
+    tag.className = 'field-tag';
+    
+    // 为x_axis和y_axis添加配置按钮
+    if (zone === 'x_axis' || zone === 'y_axis') {
+        const config = chartConfig[zone + '_config'];
+        const aggLabel = getAggregationLabel(config.aggregation);
+        // 显示格式：字段名(聚合方式)
+        const displayText = aggLabel ? `${chartConfig[zone]}(${aggLabel})` : chartConfig[zone];
+        tag.innerHTML = `
+            <span class="field-name">${displayText}</span>
+            <button class="config-field" onclick="showAxisConfig('${zone}')" title="配置">⚙️</button>
+            <button class="remove-field" onclick="removeChartField('${zone}')">&times;</button>
+        `;
+    } else {
+        tag.innerHTML = `
+            <span>${chartConfig[zone]}</span>
+            <button class="remove-field" onclick="removeChartField('${zone}')">&times;</button>
+        `;
+    }
+    
+    dropZone.appendChild(tag);
+}
+
+// 获取聚合方式的显示标签
+function getAggregationLabel(agg) {
+    const labels = {
+        'sum': '求和',
+        'avg': '平均值',
+        'count': '计数',
+        'max': '最大值',
+        'min': '最小值',
+        'none': ''
+    };
+    return labels[agg] || '';
+}
+
+// 更新联合图放置区域显示
+function updateComboDropZone(zone) {
+    if (zone === 'dimension') {
+        const dropZone = document.getElementById('comboDimensionDropZone');
+        const hint = dropZone.querySelector('.drop-hint');
+        
+        if (!comboConfig.dimension) {
+            hint.style.display = 'block';
+            dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+            return;
+        }
+        
+        hint.style.display = 'none';
+        dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+        
+        const tag = document.createElement('div');
+        tag.className = 'field-tag';
+        tag.innerHTML = `
+            <span>${comboConfig.dimension}</span>
+            <button class="remove-field" onclick="removeComboField('dimension')">&times;</button>
+        `;
+        dropZone.appendChild(tag);
+    } else if (zone === 'measures') {
+        const dropZone = document.getElementById('comboMeasuresDropZone');
+        const hint = dropZone.querySelector('.drop-hint');
+        
+        if (comboConfig.measures.length === 0) {
+            hint.style.display = 'block';
+            dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+            return;
+        }
+        
+        hint.style.display = 'none';
+        dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+        
+        // 添加每个度量的标签
+        comboConfig.measures.forEach((measure, index) => {
+            const tag = document.createElement('div');
+            tag.className = 'field-tag measure-tag';
+            
+            const chartTypeIcon = {
+                'bar': '📊',
+                'line': '📈',
+                'area': '📊'
+            }[measure.chart_type] || '📊';
+            
+            tag.innerHTML = `
+                <span class="measure-field-name">${chartTypeIcon} ${measure.field}(${getAggregationLabel(measure.aggregation)})</span>
+                <button class="config-field" onclick="showMeasureConfig(${index})" title="配置">⚙️</button>
+                <button class="remove-field" onclick="removeComboMeasure(${index})">&times;</button>
+            `;
+            dropZone.appendChild(tag);
+        });
+    }
+}
+
+// 移除联合图字段
+function removeComboField(zone) {
+    if (zone === 'dimension') {
+        comboConfig.dimension = null;
+        updateComboDropZone('dimension');
+    }
+}
+
+// 移除联合图度量
+function removeComboMeasure(index) {
+    comboConfig.measures.splice(index, 1);
+    updateComboDropZone('measures');
+}
+
+// 更新词云图拖拽区域
+function updateWordcloudDropZone(zone) {
+    if (zone === 'text') {
+        const dropZone = document.getElementById('wordcloudTextDropZone');
+        const hint = dropZone.querySelector('.drop-hint');
+        
+        if (!wordcloudConfig.text_field) {
+            hint.style.display = 'block';
+            dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+            return;
+        }
+        
+        hint.style.display = 'none';
+        dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+        
+        const tag = document.createElement('div');
+        tag.className = 'field-tag';
+        tag.innerHTML = `
+            <span>${wordcloudConfig.text_field}</span>
+            <button class="remove-field" onclick="removeWordcloudField('text')">&times;</button>
+        `;
+        dropZone.appendChild(tag);
+    } else if (zone === 'weight') {
+        const dropZone = document.getElementById('wordcloudWeightDropZone');
+        const hint = dropZone.querySelector('.drop-hint');
+        
+        if (!wordcloudConfig.weight_field) {
+            hint.style.display = 'block';
+            dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+            return;
+        }
+        
+        hint.style.display = 'none';
+        dropZone.querySelectorAll('.field-tag').forEach(tag => tag.remove());
+        
+        const tag = document.createElement('div');
+        tag.className = 'field-tag';
+        tag.innerHTML = `
+            <span>${wordcloudConfig.weight_field}</span>
+            <button class="remove-field" onclick="removeWordcloudField('weight')">&times;</button>
+        `;
+        dropZone.appendChild(tag);
+    }
+}
+
+// 移除词云图字段
+function removeWordcloudField(zone) {
+    if (zone === 'text') {
+        wordcloudConfig.text_field = null;
+        updateWordcloudDropZone('text');
+    } else if (zone === 'weight') {
+        wordcloudConfig.weight_field = null;
+        updateWordcloudDropZone('weight');
+    }
+}
+
+// 当前正在配置的度量索引
+let currentConfigMeasureIndex = null;
+
+// 显示度量配置面板
+function showMeasureConfig(index) {
+    currentConfigMeasureIndex = index;
+    const measure = comboConfig.measures[index];
+    
+    // 设置标题
+    document.getElementById('measureConfigTitle').textContent = `${measure.field} 配置`;
+    
+    // 填充当前配置
+    document.getElementById('measureChartType').value = measure.chart_type;
+    document.getElementById('measureAggregation').value = measure.aggregation;
+    
+    // 显示弹窗
+    document.getElementById('measureConfigModal').style.display = 'flex';
+}
+
+// 关闭度量配置面板
+function closeMeasureConfig(event) {
+    if (!event || event.target.id === 'measureConfigModal' || event.target.className === 'modal-close-btn' || event.target.closest('.btn-secondary')) {
+        document.getElementById('measureConfigModal').style.display = 'none';
+        currentConfigMeasureIndex = null;
+    }
+}
+
+// 保存度量配置
+function saveMeasureConfig() {
+    if (currentConfigMeasureIndex === null) return;
+    
+    const measure = comboConfig.measures[currentConfigMeasureIndex];
+    
+    // 获取配置值
+    measure.chart_type = document.getElementById('measureChartType').value;
+    measure.aggregation = document.getElementById('measureAggregation').value;
+    
+    // 更新显示
+    updateComboDropZone('measures');
+    
+    // 关闭弹窗
+    document.getElementById('measureConfigModal').style.display = 'none';
+    currentConfigMeasureIndex = null;
+}
+
+// 当前正在配置的轴
+let currentConfigAxis = null;
+
+// 显示轴配置面板
+function showAxisConfig(axis) {
+    currentConfigAxis = axis;
+    const config = chartConfig[axis + '_config'];
+    const axisLabel = axis === 'x_axis' ? 'X轴' : 'Y轴';
+    
+    // 设置标题
+    document.getElementById('axisConfigTitle').textContent = `${axisLabel}设置`;
+    
+    // 填充当前配置
+    document.getElementById('axisAggregation').value = config.aggregation;
+    document.getElementById('axisSort').value = config.sort;
+    document.getElementById('axisFormat').value = config.format;
+    document.getElementById('axisName').value = config.axis_name;
+    
+    // 设置对数轴选项
+    const logScaleRadios = document.getElementsByName('logScale');
+    logScaleRadios.forEach(radio => {
+        radio.checked = radio.value === String(config.log_scale);
+    });
+    
+    // 显示弹窗
+    document.getElementById('axisConfigModal').style.display = 'flex';
+}
+
+// 关闭轴配置面板
+function closeAxisConfig(event) {
+    if (!event || event.target.id === 'axisConfigModal' || event.target.className === 'modal-close-btn' || event.target.closest('.btn-secondary')) {
+        document.getElementById('axisConfigModal').style.display = 'none';
+        currentConfigAxis = null;
+    }
+}
+
+// 保存轴配置
+function saveAxisConfig() {
+    if (!currentConfigAxis) return;
+    
+    const config = chartConfig[currentConfigAxis + '_config'];
+    
+    // 获取配置值
+    config.aggregation = document.getElementById('axisAggregation').value;
+    config.sort = document.getElementById('axisSort').value;
+    config.format = document.getElementById('axisFormat').value;
+    config.axis_name = document.getElementById('axisName').value.trim();
+    
+    // 获取对数轴设置
+    const logScaleRadios = document.getElementsByName('logScale');
+    for (const radio of logScaleRadios) {
+        if (radio.checked) {
+            config.log_scale = radio.value === 'true';
+            break;
+        }
+    }
+    
+    // 更新显示
+    updateChartDropZone(currentConfigAxis);
+    
+    // 关闭弹窗
+    document.getElementById('axisConfigModal').style.display = 'none';
+    currentConfigAxis = null;
+}
+
+// 移除图表字段
+function removeChartField(zone) {
+    chartConfig[zone] = null;
+    updateChartDropZone(zone);
+}
+
+// 生成表格
+function generateTable() {
+    if (!selectedFileId) {
+        alert(allTexts.please_select_data_file);
+        return;
+    }
+    
+    // 旭日图使用图表生成接口
+    if (currentVisualizationType === 'sunburst') {
+        if (dragConfig.rows.length === 0) {
+            alert('旭日图需要至少一个维度字段（行）');
+            return;
+        }
+        if (dragConfig.values.length === 0) {
+            alert('旭日图需要一个度量字段（值）');
+            return;
+        }
+        
+        showLoading(allTexts.generating_sunburst);
+        
+        fetch('/api/chart/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                file_id: selectedFileId,
+                chart_type: 'sunburst',
+                rows: dragConfig.rows,
+                values: dragConfig.values,
+                theme: currentTheme
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                currentChartFilename = data.filename;
+                displayChart(data);
+            } else {
+                alert('生成失败: ' + data.message);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            alert('生成失败: ' + error.message);
+        });
+        return;
+    }
+    
+    // 其他表格类型
+    showLoading(allTexts.generating_table);
+    
+    fetch('/api/table/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            table_type: currentVisualizationType,
+            rows: dragConfig.rows,
+            columns: dragConfig.columns,
+            values: dragConfig.values
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            displayTable(data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 切换文字选项面板
+function toggleTextOptions() {
+    const panel = document.getElementById('textOptionsPanel');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+// 切换文字输入框启用状态
+function toggleTextInput(type) {
+    // 特殊处理ID的大小写
+    let checkboxId, inputId;
+    if (type === 'title') {
+        checkboxId = 'enableTitle';
+        inputId = 'titleInput';
+    } else if (type === 'xlabel') {
+        checkboxId = 'enableXLabel';
+        inputId = 'xlabelInput';
+    } else if (type === 'ylabel') {
+        checkboxId = 'enableYLabel';
+        inputId = 'ylabelInput';
+    }
+    
+    const checkbox = document.getElementById(checkboxId);
+    const input = document.getElementById(inputId);
+    input.disabled = !checkbox.checked;
+    if (!checkbox.checked) {
+        input.value = '';
+    }
+}
+
+// 生成词云图
+function generateWordcloud() {
+    if (!selectedFileId) {
+        alert(allTexts.please_select_data_file);
+        return;
+    }
+    
+    if (!wordcloudConfig.text_field) {
+        alert(allTexts.select_text_field);
+        return;
+    }
+    
+    // 获取选择的形状
+    const shape = document.getElementById('wordcloudShapeSelect').value;
+    
+    showLoading(allTexts.generating_wordcloud);
+    
+    fetch('/api/chart/wordcloud/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            text_field: wordcloudConfig.text_field,
+            weight_field: wordcloudConfig.weight_field,
+            shape: shape,
+            theme: currentTheme
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            currentChartFilename = data.filename;
+            displayChart(data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('生成失败: ' + error.message);
+    });
+}
+
+function generateComboChart() {
+    if (!selectedFileId) {
+        alert(allTexts.please_select_data_file);
+        return;
+    }
+    
+    if (!comboConfig.dimension) {
+        alert(allTexts.please_select_dimension_xaxis);
+        return;
+    }
+    
+    if (comboConfig.measures.length === 0) {
+        alert('请至少添加一个度量字段');
+        return;
+    }
+    
+    showLoading(allTexts.generating_combo);
+    
+    fetch('/api/chart/combo/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            chart_type: currentVisualizationType,  // combo_single 或 combo_dual
+            dimension: comboConfig.dimension,
+            measures: comboConfig.measures,
+            theme: currentTheme
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            currentChartFilename = data.filename;
+            displayChart(data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 生成图表
+function generateChart() {
+    if (!selectedFileId) {
+        alert(allTexts.please_select_data_file);
+        return;
+    }
+    
+    if (!chartConfig.x_axis || !chartConfig.y_axis) {
+        alert(allTexts.please_select_xy_axis);
+        return;
+    }
+    
+    // 获取自定义文字
+    const customTitle = document.getElementById('enableTitle').checked ? 
+        document.getElementById('titleInput').value : '';
+    const customXLabel = document.getElementById('enableXLabel').checked ? 
+        document.getElementById('xlabelInput').value : '';
+    const customYLabel = document.getElementById('enableYLabel').checked ? 
+        document.getElementById('ylabelInput').value : '';
+    
+    showLoading(allTexts.generating_chart);
+    
+    fetch('/api/chart/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            file_id: selectedFileId,
+            chart_type: currentVisualizationType,
+            x_axis: chartConfig.x_axis,
+            y_axis: chartConfig.y_axis,
+            group_field: chartConfig.group_field,  // 散点图分组字段
+            x_axis_config: chartConfig.x_axis_config,  // X轴配置
+            y_axis_config: chartConfig.y_axis_config,  // Y轴配置
+            custom_title: customTitle,
+            custom_xlabel: customXLabel,
+            custom_ylabel: customYLabel,
+            theme: currentTheme
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            currentChartFilename = data.filename;
+            displayChart(data);
+        } else {
+            alert('生成失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('生成失败: ' + error.message);
+    });
+}
+
+// 显示表格
+function displayTable(data) {
+    const displayArea = document.getElementById('tableDisplayArea');
+    
+    let html = '<div class="table-container">';
+    html += `<div class="table-header">
+        <h3>${data.table_type === 'list' ? '📋 清单表' : '📊 交叉表'}</h3>
+        <span class="table-info">共 ${data.total_rows} 行${data.displayed_rows ? '，显示 ' + data.displayed_rows + ' 行' : ''}</span>
+    </div>`;
+    
+    html += '<div class="table-wrapper"><table class="data-table">';
+    
+    // 表头
+    html += '<thead><tr>';
+    data.columns.forEach(col => {
+        html += `<th>${col}</th>`;
+    });
+    html += '</tr></thead>';
+    
+    // 表体
+    html += '<tbody>';
+    data.data.forEach(row => {
+        html += '<tr>';
+        row.forEach(cell => {
+            const displayValue = typeof cell === 'number' ? cell.toLocaleString() : cell;
+            html += `<td>${displayValue}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody>';
+    
+    html += '</table></div></div>';
+    
+    displayArea.innerHTML = html;
+}
+
+// 显示图表
+function displayChart(data) {
+    const displayArea = document.getElementById('tableDisplayArea');
+    
+    const chartTypeNames = {
+        'line': '📈 折线图',
+        'area': '📊 面积图',
+        'pie': '🥧 饼图',
+        'bar': '📊 柱状图',
+        'waterfall': '📈 瀑布图',
+        'scatter': '🔵 散点图',
+        'combo_single': '📊 单Y联合图',
+        'combo_dual': '📊 双Y联合图',
+        'wordcloud': '☁️ 词云图',
+        'sunburst': '☀️ 旭日图',
+        'map': '🗺️ 中国地图'
+    };
+    
+    let html = '<div class="chart-container">';
+    html += `<div class="chart-header">
+        <h3>${chartTypeNames[data.chart_type] || '图表'}</h3>
+        <button class="btn-download-chart" onclick="downloadChart()">
+            📥 下载${data.is_html ? 'HTML' : '图表'}
+        </button>
+    </div>`;
+    
+    if (data.is_html) {
+        // 显示HTML内容（地图）- 使用iframe
+        html += `<div class="chart-display map-display">
+            <iframe src="${data.chart_url}" frameborder="0" class="map-iframe"></iframe>
+        </div>`;
+    } else {
+        // 显示图片（柱状图、瀑布图）
+        html += `<div class="chart-display">
+            <img src="${data.image}" alt="${data.chart_type}" class="chart-image">
+        </div>`;
+    }
+    
+    html += '</div>';
+    
+    displayArea.innerHTML = html;
+}
+
+// 下载图表
+function downloadChart() {
+    if (!currentChartFilename) {
+        alert('没有可下载的图表');
+        return;
+    }
+    
+    window.location.href = `/api/chart/download/${currentChartFilename}`;
+}
+
+// 删除文件
+function deleteFile(fileId) {
+    if (!confirm('确定要删除这个文件吗？')) {
+        return;
+    }
+
+    showLoading('正在删除...');
+
+    fetch(`/api/file/${fileId}/delete`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('删除失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        alert('删除失败: ' + error.message);
+    });
+}
+
+// 折叠/展开分组
+function toggleGroup(groupId) {
+    const list = document.getElementById(groupId + 'List');
+    const icon = event.target;
+    
+    if (list.style.display === 'none') {
+        list.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        list.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+// 显示加载提示
+function showLoading(message) {
+    const loading = document.createElement('div');
+    loading.id = 'loadingOverlay';
+    loading.className = 'loading-overlay';
+    loading.innerHTML = `
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>${message}</p>
+        </div>
+    `;
+    document.body.appendChild(loading);
+}
+
+// 隐藏加载提示
+function hideLoading() {
+    const loading = document.getElementById('loadingOverlay');
+    if (loading) {
+        loading.remove();
+    }
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 如果有文件，自动选择第一个文件
+    const selector = document.getElementById('fileSelector');
+    if (selector && selector.options.length > 1) {
+        // 跳过第一个"请选择文件"选项，选择第一个实际文件
+        const firstFileId = selector.options[1].value;
+        if (firstFileId) {
+            selector.value = firstFileId;
+            // 注意：不自动调用selectFile，让用户手动选择或拖拽
+            // 如果需要自动加载，取消下面这行的注释：
+            // selectFile(parseInt(firstFileId));
+        }
+    }
+});
+</script>
+{% endblock %}
