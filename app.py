@@ -137,6 +137,10 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     
+    # 确保session中有语言设置
+    if 'language' not in session:
+        session['language'] = 'zh'
+    
     # 获取当前语言
     lang = session.get('language', 'zh')
     texts = get_all_texts(lang)
@@ -189,6 +193,10 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     
+    # 确保session中有语言设置
+    if 'language' not in session:
+        session['language'] = 'zh'
+    
     # 获取当前语言
     lang = session.get('language', 'zh')
     texts = get_all_texts(lang)
@@ -222,9 +230,17 @@ def login():
 @login_required
 def dashboard():
     """主页面路由 - 需要登录"""
+    # 确保session中有语言设置
+    if 'language' not in session:
+        session['language'] = 'zh'
+    
     # 获取当前语言
     lang = session.get('language', 'zh')
     texts = get_all_texts(lang)
+    
+    # 验证texts是字典且包含必要的键
+    if not isinstance(texts, dict) or 'values' not in texts:
+        texts = get_all_texts('zh')
     
     # 获取当前用户的所有数据文件
     data_files = DataFile.query.filter_by(user_id=current_user.id).order_by(DataFile.upload_time.desc()).all()
@@ -235,9 +251,17 @@ def dashboard():
 @login_required
 def dashboard_new():
     """新仪表盘界面 - 类似Tableau的拖拽式仪表盘"""
+    # 确保session中有语言设置
+    if 'language' not in session:
+        session['language'] = 'zh'
+    
     # 获取当前语言
     lang = session.get('language', 'zh')
     texts = get_all_texts(lang)
+    
+    # 验证texts是字典且包含必要的键
+    if not isinstance(texts, dict) or 'values' not in texts:
+        texts = get_all_texts('zh')
     
     # 获取当前用户的所有数据文件
     data_files = DataFile.query.filter_by(user_id=current_user.id).order_by(DataFile.upload_time.desc()).all()
@@ -592,18 +616,18 @@ def generate_chart():
         # 主题颜色
         theme = data.get('theme', 'purple')  # 默认紫色系
         
-        # 主题颜色配置
+        # 现代化主题颜色配置 - 使用渐变和高级配色
         theme_colors = {
-            'purple': {'primary': '#667eea', 'secondary': '#764ba2', 'multi': ['#9b87f5', '#7c6fd6', '#667eea', '#5757d8', '#4641c6']},
-            'blue': {'primary': '#4299e1', 'secondary': '#2b6cb0', 'multi': ['#90cdf4', '#63b3ed', '#4299e1', '#3182ce', '#2c5282']},
-            'green': {'primary': '#48bb78', 'secondary': '#2f855a', 'multi': ['#9ae6b4', '#68d391', '#48bb78', '#38a169', '#2f855a']},
-            'red': {'primary': '#f56565', 'secondary': '#c53030', 'multi': ['#fc8181', '#f56565', '#e53e3e', '#c53030', '#9b2c2c']},
-            'orange': {'primary': '#ed8936', 'secondary': '#c05621', 'multi': ['#fbd38d', '#f6ad55', '#ed8936', '#dd6b20', '#c05621']},
-            'pink': {'primary': '#ed64a6', 'secondary': '#b83280', 'multi': ['#fbb6ce', '#f687b3', '#ed64a6', '#d53f8c', '#b83280']},
-            'teal': {'primary': '#38b2ac', 'secondary': '#2c7a7b', 'multi': ['#81e6d9', '#4fd1c5', '#38b2ac', '#319795', '#2c7a7b']},
-            'sunset': {'primary': '#f093fb', 'secondary': '#f5576c', 'multi': ['#fbc2eb', '#f093fb', '#f57b94', '#f5576c', '#d63447']},
-            'ocean': {'primary': '#667eea', 'secondary': '#00c9ff', 'multi': ['#8b9aed', '#667eea', '#4395e6', '#00b9e3', '#00c9ff']},
-            'forest': {'primary': '#56ab2f', 'secondary': '#a8e063', 'multi': ['#6bc248', '#56ab2f', '#75b94d', '#92c96e', '#a8e063']}
+            'purple': {'primary': '#667eea', 'secondary': '#764ba2', 'multi': ['#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95']},
+            'blue': {'primary': '#3b82f6', 'secondary': '#1e40af', 'multi': ['#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8', '#1e40af', '#1e3a8a']},
+            'green': {'primary': '#10b981', 'secondary': '#047857', 'multi': ['#6ee7b7', '#34d399', '#10b981', '#059669', '#047857', '#065f46']},
+            'red': {'primary': '#ef4444', 'secondary': '#b91c1c', 'multi': ['#f87171', '#ef4444', '#dc2626', '#b91c1c', '#991b1b', '#7f1d1d']},
+            'orange': {'primary': '#f97316', 'secondary': '#c2410c', 'multi': ['#fb923c', '#f97316', '#ea580c', '#c2410c', '#9a3412', '#7c2d12']},
+            'pink': {'primary': '#ec4899', 'secondary': '#be185d', 'multi': ['#f472b6', '#ec4899', '#db2777', '#be185d', '#9f1239', '#831843']},
+            'teal': {'primary': '#14b8a6', 'secondary': '#0f766e', 'multi': ['#5eead4', '#2dd4bf', '#14b8a6', '#0d9488', '#0f766e', '#115e59']},
+            'sunset': {'primary': '#f093fb', 'secondary': '#f5576c', 'multi': ['#fbc2eb', '#f093fb', '#f57b94', '#f5576c', '#d63447', '#c02040']},
+            'ocean': {'primary': '#667eea', 'secondary': '#00c9ff', 'multi': ['#8b9aed', '#667eea', '#4395e6', '#00b9e3', '#00c9ff', '#00e5ff']},
+            'forest': {'primary': '#56ab2f', 'secondary': '#a8e063', 'multi': ['#6bc248', '#56ab2f', '#75b94d', '#92c96e', '#a8e063', '#c0e87f']}
         }
         
         # 获取当前主题颜色
@@ -1185,7 +1209,7 @@ def generate_chart():
             
             # 创建地图（白色背景 + 蓝色深浅渐变）
             print(f"\n开始创建pyecharts地图...")
-            print(f"传递给pyecharts的data_pair: {map_data}")
+            print(f"传递给pyecharts 的data_pair: {map_data}")
             
             map_chart = Map(init_opts=opts.InitOpts(
                 width="100%", 
@@ -1561,18 +1585,18 @@ def generate_combo_chart():
         measures = data.get('measures', [])  # 度量配置列表
         theme = data.get('theme', 'purple')
         
-        # 主题颜色配置
+        # 现代化主题颜色配置 - 使用渐变和高级配色
         theme_colors = {
-            'purple': {'primary': '#667eea', 'secondary': '#764ba2', 'multi': ['#9b87f5', '#7c6fd6', '#667eea', '#5757d8', '#4641c6']},
-            'blue': {'primary': '#4299e1', 'secondary': '#2b6cb0', 'multi': ['#90cdf4', '#63b3ed', '#4299e1', '#3182ce', '#2c5282']},
-            'green': {'primary': '#48bb78', 'secondary': '#2f855a', 'multi': ['#9ae6b4', '#68d391', '#48bb78', '#38a169', '#2f855a']},
-            'red': {'primary': '#f56565', 'secondary': '#c53030', 'multi': ['#fc8181', '#f56565', '#e53e3e', '#c53030', '#9b2c2c']},
-            'orange': {'primary': '#ed8936', 'secondary': '#c05621', 'multi': ['#fbd38d', '#f6ad55', '#ed8936', '#dd6b20', '#c05621']},
-            'pink': {'primary': '#ed64a6', 'secondary': '#b83280', 'multi': ['#fbb6ce', '#f687b3', '#ed64a6', '#d53f8c', '#b83280']},
-            'teal': {'primary': '#38b2ac', 'secondary': '#2c7a7b', 'multi': ['#81e6d9', '#4fd1c5', '#38b2ac', '#319795', '#2c7a7b']},
-            'sunset': {'primary': '#f093fb', 'secondary': '#f5576c', 'multi': ['#fbc2eb', '#f093fb', '#f57b94', '#f5576c', '#d63447']},
-            'ocean': {'primary': '#667eea', 'secondary': '#00c9ff', 'multi': ['#8b9aed', '#667eea', '#4395e6', '#00b9e3', '#00c9ff']},
-            'forest': {'primary': '#56ab2f', 'secondary': '#a8e063', 'multi': ['#6bc248', '#56ab2f', '#75b94d', '#92c96e', '#a8e063']}
+            'purple': {'primary': '#667eea', 'secondary': '#764ba2', 'multi': ['#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95']},
+            'blue': {'primary': '#3b82f6', 'secondary': '#1e40af', 'multi': ['#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8', '#1e40af', '#1e3a8a']},
+            'green': {'primary': '#10b981', 'secondary': '#047857', 'multi': ['#6ee7b7', '#34d399', '#10b981', '#059669', '#047857', '#065f46']},
+            'red': {'primary': '#ef4444', 'secondary': '#b91c1c', 'multi': ['#f87171', '#ef4444', '#dc2626', '#b91c1c', '#991b1b', '#7f1d1d']},
+            'orange': {'primary': '#f97316', 'secondary': '#c2410c', 'multi': ['#fb923c', '#f97316', '#ea580c', '#c2410c', '#9a3412', '#7c2d12']},
+            'pink': {'primary': '#ec4899', 'secondary': '#be185d', 'multi': ['#f472b6', '#ec4899', '#db2777', '#be185d', '#9f1239', '#831843']},
+            'teal': {'primary': '#14b8a6', 'secondary': '#0f766e', 'multi': ['#5eead4', '#2dd4bf', '#14b8a6', '#0d9488', '#0f766e', '#115e59']},
+            'sunset': {'primary': '#f093fb', 'secondary': '#f5576c', 'multi': ['#fbc2eb', '#f093fb', '#f57b94', '#f5576c', '#d63447', '#c02040']},
+            'ocean': {'primary': '#667eea', 'secondary': '#00c9ff', 'multi': ['#8b9aed', '#667eea', '#4395e6', '#00b9e3', '#00c9ff', '#00e5ff']},
+            'forest': {'primary': '#56ab2f', 'secondary': '#a8e063', 'multi': ['#6bc248', '#56ab2f', '#75b94d', '#92c96e', '#a8e063', '#c0e87f']}
         }
         colors = theme_colors.get(theme, theme_colors['purple'])
         
@@ -1843,15 +1867,15 @@ def generate_wordcloud():
         shape = data.get('shape', 'rectangle')  # 形状
         theme = data.get('theme', 'purple')
         
-        # 主题颜色配置
+        # 现代化主题颜色配置 - 词云图专用
         theme_colors = {
             'purple': '#667eea',
-            'blue': '#4299e1',
-            'green': '#48bb78',
-            'red': '#f56565',
-            'orange': '#ed8936',
-            'pink': '#ed64a6',
-            'teal': '#38b2ac',
+            'blue': '#3b82f6',
+            'green': '#10b981',
+            'red': '#ef4444',
+            'orange': '#f97316',
+            'pink': '#ec4899',
+            'teal': '#14b8a6',
             'sunset': '#f093fb',
             'ocean': '#667eea',
             'forest': '#56ab2f'
