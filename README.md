@@ -10,10 +10,11 @@
 - 🌐 **中英文切换**：完整的国际化支持
 - 📐 **两种模式**：
   - 经典模式：传统的拖拽字段生成图表
-  - ![Uploading image.png…]()
-
+  <img width="2478" height="1487" alt="image" src="https://github.com/user-attachments/assets/60905ff0-3c2e-4580-b7c4-879e46bd09f2" />
   - 仪表盘模式：自由布局的可视化仪表盘
+  <img width="2478" height="1487" alt="image" src="https://github.com/user-attachments/assets/03ddd6c8-3dfb-4022-acac-aad008979f94" />
 - 🔐 **用户系统**：注册、登录、数据隔离
+  <img width="2478" height="1487" alt="image" src="https://github.com/user-attachments/assets/106774de-ac36-43c0-89b1-75acbcd41496" />
 - 📁 **文件管理**：支持Excel和CSV文件上传
 
 ## 技术栈
